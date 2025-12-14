@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+/* Custom fonts */
+@layer base {
+  :root {
+    --font-inter: "Inter", sans-serif;
+    --font-lora: "Lora", serif;
+    --font-playfair: "Playfair Display", serif;
+  }
+}
+
+/* View Transitions Component Classes */
+@layer components {
+  .view-section {
+    @apply absolute inset-0 flex flex-col w-full h-full transition-all duration-700 ease-out;
+    will-change: opacity, transform;
+  }
+
+  .view-section.hidden {
+    @apply opacity-0 pointer-events-none scale-95 z-0;
+  }
+
+  .view-section.active {
+    @apply opacity-100 pointer-events-auto scale-100 z-10;
+  }
+}
+
+/* Custom animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-35px);
+  }
+}
+
+/* Tooltip animation */
+.fmt-btn[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: black;
+  color: white;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: fadeInUp 0.2s forwards;
+}
+
+/* Editor placeholder */
+#editor:empty::before {
+  content: attr(placeholder);
+  color: rgba(0, 0, 0, 0.2);
+  display: block;
+}
+
+body.zen-active #editor:empty::before {
+  color: rgba(255, 255, 255, 0.1);
+}
+
+/* Editor heading styles */
+#editor h2 {
+  font-family: var(--font-playfair);
+  font-size: 2rem;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+#editor b {
+  font-weight: 700;
+}
+
+/* Entry indicator dot */
+.day-has-entry::after {
+  content: "";
+  position: absolute;
+  bottom: 15px;
+  right: 15px;
+  width: 6px;
+  height: 6px;
+  background: black;
+  border-radius: 50%;
+}
