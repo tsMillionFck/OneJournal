@@ -88,3 +88,16 @@ body.zen-active #editor:empty::before {
   background: black;
   border-radius: 50%;
 }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}

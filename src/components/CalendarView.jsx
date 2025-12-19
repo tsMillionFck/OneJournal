@@ -1,5 +1,9 @@
 import React from "react";
-import { formatDateKey, getStorageKey } from "../data/constants";
+import {
+  formatDateKey,
+  getStorageKey,
+  getTodosForDate,
+} from "../data/constants";
 
 const CalendarView = ({
   currentYear,
@@ -54,6 +58,11 @@ const CalendarView = ({
       : "text-gray-400 font-medium";
     const entryClass = hasEntry(day) ? "day-has-entry" : "";
 
+    const todos = getTodosForDate(
+      formatDateKey(currentYear, currentMonth, day)
+    );
+    const topTodos = todos.slice(0, 3);
+
     return (
       <div
         key={day}
@@ -61,6 +70,28 @@ const CalendarView = ({
         onClick={() => onOpenJournal(day)}
       >
         <div className={`text-sm mb-2 ${todayNumClass}`}>{day}</div>
+        <div className="flex flex-col gap-1 mt-1 overflow-hidden">
+          {topTodos.map((todo) => (
+            <div
+              key={todo.id}
+              className="text-[10px] text-gray-500 truncate flex items-center gap-1"
+            >
+              <span
+                className={`w-1 h-1 rounded-full ${
+                  todo.completed ? "bg-gray-300" : "bg-black"
+                }`}
+              ></span>
+              <span className={todo.completed ? "line-through opacity-50" : ""}>
+                {todo.text}
+              </span>
+            </div>
+          ))}
+          {todos.length > 3 && (
+            <div className="text-[9px] text-gray-400 pl-2">
+              +{todos.length - 3} more
+            </div>
+          )}
+        </div>
       </div>
     );
   });

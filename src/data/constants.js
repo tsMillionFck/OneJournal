@@ -56,4 +56,99 @@ export const formatDateKey = (year, month, day) =>
     "0"
   )}`;
 
+// Generate unique journal ID
+export const generateJournalId = () =>
+  `journal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+// Storage key for journals list (per day)
+export const getJournalsListKey = (dateKey) => `journals_list_${dateKey}`;
+
+// Storage key for individual journal content
+export const getJournalContentKey = (journalId) =>
+  `journal_content_${journalId}`;
+
+// Legacy storage key (for migration)
 export const getStorageKey = (dateKey) => `journal_${dateKey}`;
+
+// Get all journals for a date
+export const getJournalsForDate = (dateKey) => {
+  const listKey = getJournalsListKey(dateKey);
+  const journalsList = localStorage.getItem(listKey);
+
+  if (journalsList) {
+    return JSON.parse(journalsList);
+  }
+
+  // Check for legacy single journal and migrate
+  const legacyKey = getStorageKey(dateKey);
+  const legacyContent = localStorage.getItem(legacyKey);
+
+  if (legacyContent) {
+    // Migrate legacy journal to new format
+    const newJournalId = generateJournalId();
+    const newJournal = {
+      id: newJournalId,
+      title: "Journal 1",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    // Save migrated data
+    localStorage.setItem(listKey, JSON.stringify([newJournal]));
+    localStorage.setItem(getJournalContentKey(newJournalId), legacyContent);
+    localStorage.removeItem(legacyKey); // Clean up legacy
+
+    return [newJournal];
+  }
+
+  return [];
+};
+
+// Save journal metadata to list
+export const saveJournalToList = (dateKey, journal) => {
+  const listKey = getJournalsListKey(dateKey);
+  const journals = getJournalsForDate(dateKey);
+
+  const existingIndex = journals.findIndex((j) => j.id === journal.id);
+  if (existingIndex >= 0) {
+    journals[existingIndex] = {
+      ...journals[existingIndex],
+      ...journal,
+      updatedAt: Date.now(),
+    };
+  } else {
+    journals.push(journal);
+  }
+
+  localStorage.setItem(listKey, JSON.stringify(journals));
+  return journals;
+};
+
+// Delete journal
+export const deleteJournal = (dateKey, journalId) => {
+  const listKey = getJournalsListKey(dateKey);
+  const journals = getJournalsForDate(dateKey);
+
+  const filtered = journals.filter((j) => j.id !== journalId);
+  localStorage.setItem(listKey, JSON.stringify(filtered));
+  localStorage.removeItem(getJournalContentKey(journalId));
+
+  return filtered;
+};
+
+// Storage key for todos list (per day)
+export const getTodosKey = (dateKey) => `todos_${dateKey}`;
+
+// Get todos for a date
+export const getTodosForDate = (dateKey) => {
+  const key = getTodosKey(dateKey);
+  const data = localStorage.getItem(key);
+  return data ? JSON.parse(data) : [];
+};
+
+// Save todos for a date
+export const saveTodosForDate = (dateKey, todos) => {
+  const key = getTodosKey(dateKey);
+  localStorage.setItem(key, JSON.stringify(todos));
+  return todos;
+};
