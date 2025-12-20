@@ -73,6 +73,31 @@ body.zen-active #editor:empty::before {
   margin-bottom: 0.5em;
 }
 
+#editor blockquote {
+  border-left: 3px solid #e5e7eb;
+  padding-left: 1rem;
+  font-style: italic;
+  color: #6b7280;
+  margin: 1.5em 0;
+}
+
+body.zen-active #editor blockquote {
+  border-color: #374151;
+  color: #9ca3af;
+}
+
+#editor ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin: 1em 0;
+}
+
+#editor ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin: 1em 0;
+}
+
 #editor b {
   font-weight: 700;
 }

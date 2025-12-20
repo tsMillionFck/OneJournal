@@ -3,6 +3,7 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import CalendarView from "./components/CalendarView";
 import JournalView from "./components/JournalView";
+import GraphView from "./components/GraphView";
 
 gsap.registerPlugin(useGSAP);
 
@@ -17,6 +18,31 @@ function App() {
 
   // Zen mode state
   const [zenMode, setZenMode] = useState(false);
+
+  // Habits state (Lifted from GraphView)
+  const [habits, setHabits] = useState(() => {
+    const saved = localStorage.getItem("dynamic-habits-v1");
+    // If null, return empty array
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("dynamic-habits-v1", JSON.stringify(habits));
+  }, [habits]);
+
+  const handleAddHabit = (habit) => {
+    setHabits([habit, ...habits]);
+  };
+
+  const handleUpdateHabit = (id) => {
+    setHabits((prev) =>
+      prev.map((h) => (h.id === id ? { ...h, x: h.x + 1 } : h))
+    );
+  };
+
+  const handleDeleteHabit = (id) => {
+    setHabits((prev) => prev.filter((h) => h.id !== id));
+  };
 
   const containerRef = useRef(null);
 
@@ -33,9 +59,16 @@ function App() {
   useGSAP(() => {
     // Determine entering view based on state
     const enteringSelector =
-      currentView === "calendar" ? "#calendar-view" : "#journal-view";
+      currentView === "calendar"
+        ? "#calendar-view"
+        : currentView === "journal"
+        ? "#journal-view"
+        : "#graph-view";
+
     const exitingSelector =
-      currentView === "calendar" ? "#journal-view" : "#calendar-view";
+      currentView === "calendar"
+        ? "#journal-view, #graph-view" // If moving to calendar, hide others
+        : "#calendar-view"; // If moving to journal/graph, hide calendar (this logic might need refinement if navigating between non-calendar views directly, but for now it's Calendar <-> Others)
 
     const enteringView = document.querySelector(enteringSelector);
     const exitingView = document.querySelector(exitingSelector);
@@ -67,6 +100,10 @@ function App() {
   const handleOpenJournal = (day) => {
     setActiveDayNum(day);
     setCurrentView("journal");
+  };
+
+  const handleOpenGraph = () => {
+    setCurrentView("graph");
   };
 
   const handleBackToCalendar = () => {
@@ -122,6 +159,7 @@ function App() {
         currentYear={currentYear}
         currentMonth={currentMonth}
         onOpenJournal={handleOpenJournal}
+        onOpenGraph={handleOpenGraph}
         onChangeMonth={handleChangeMonth}
         onGoToToday={handleGoToToday}
         isActive={currentView === "calendar"}
@@ -135,6 +173,18 @@ function App() {
         zenMode={zenMode}
         onSetZenMode={setZenMode}
         isActive={currentView === "journal"}
+        habits={habits}
+        onAddHabit={handleAddHabit}
+        onUpdateHabit={handleUpdateHabit}
+        onDeleteHabit={handleDeleteHabit}
+      />
+      <GraphView
+        onBack={handleBackToCalendar}
+        isActive={currentView === "graph"}
+        habits={habits}
+        onAddHabit={handleAddHabit}
+        onUpdateHabit={handleUpdateHabit}
+        onDeleteHabit={handleDeleteHabit}
       />
     </div>
   );

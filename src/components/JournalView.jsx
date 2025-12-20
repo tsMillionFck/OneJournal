@@ -12,6 +12,7 @@ import {
   getTodosForDate,
   saveTodosForDate,
 } from "../data/constants";
+import TaskPanel from "./TaskPanel";
 
 const JournalView = ({
   currentYear,
@@ -22,6 +23,10 @@ const JournalView = ({
   zenMode,
   onSetZenMode,
   isActive,
+  habits = [],
+  onAddHabit,
+  onUpdateHabit,
+  onDeleteHabit,
 }) => {
   // State for dynamic content
   const [quote, setQuote] = useState(getRandomQuote());
@@ -29,7 +34,7 @@ const JournalView = ({
   const [activeFramework, setActiveFramework] = useState("standard");
   const [todos, setTodos] = useState([]);
   const [showTodos, setShowTodos] = useState(false);
-  const [newTodo, setNewTodo] = useState("");
+
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Multi-journal state
@@ -48,6 +53,7 @@ const JournalView = ({
     justifyCenter: false,
     unorderedList: false,
     orderedList: false,
+    blockquote: false,
   });
 
   // List dropdown state
@@ -175,17 +181,17 @@ const JournalView = ({
   };
 
   // Todo handlers
-  const handleAddTodo = (e) => {
-    if (e.key === "Enter" && newTodo.trim()) {
+  // Todo handlers
+  const handleAddTodo = (text) => {
+    if (text.trim()) {
       const newItem = {
         id: Date.now(),
-        text: newTodo.trim(),
+        text: text.trim(),
         completed: false,
       };
       const updatedTodos = [...todos, newItem];
       setTodos(updatedTodos);
       saveTodosForDate(dateKey, updatedTodos);
-      setNewTodo("");
     }
   };
 
@@ -245,8 +251,8 @@ const JournalView = ({
 
   // Format command execution
   const format = (command, value = null) => {
-    document.execCommand(command, false, value);
     editorRef.current?.focus();
+    document.execCommand(command, false, value);
     checkFormats();
   };
 
@@ -260,6 +266,9 @@ const JournalView = ({
       justifyCenter: document.queryCommandState("justifyCenter"),
       unorderedList: document.queryCommandState("insertUnorderedList"),
       orderedList: document.queryCommandState("insertOrderedList"),
+      blockquote:
+        document.queryCommandValue("formatBlock").toLowerCase() ===
+        "blockquote",
     });
   };
 
@@ -343,15 +352,33 @@ const JournalView = ({
             e.preventDefault();
             createNewJournal();
             break;
+          case "q": // Shortcut for blockquote
+            e.preventDefault();
+            format("formatBlock", "BLOCKQUOTE");
+            break;
+          case "enter":
+            if (formatState.blockquote) {
+              e.preventDefault();
+              document.execCommand("insertParagraph");
+              document.execCommand("formatBlock", false, "div");
+            }
+            break;
           default:
             break;
+        }
+      } else {
+        // Non-meta keys
+        if (e.key === "Enter" && formatState.blockquote) {
+          e.preventDefault();
+          document.execCommand("insertParagraph");
+          document.execCommand("formatBlock", false, "div");
         }
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [saveEntry, journals]);
+  }, [saveEntry, journals, formatState]);
 
   // Handle editor focus for zen mode
   const handleEditorFocus = () => {
@@ -390,7 +417,7 @@ const JournalView = ({
     >
       {/* Left Side Panel - Quotes */}
       <aside
-        className={`fixed top-1/2 -translate-y-[45%] left-0 w-70 p-10 text-right border-r border-black/5 z-50 transition-opacity duration-800 ${
+        className={`fixed top-1/2 -translate-y-[45%] left-0 w-70 p-10 text-right border-r border-black/5 z-50 transition-opacity duration-800 hidden xl:block ${
           zenMode ? "opacity-0 pointer-events-none" : "opacity-70"
         }`}
       >
@@ -471,7 +498,7 @@ const JournalView = ({
 
       {/* Main Journal Stage */}
       <div
-        className="h-full w-full flex flex-col items-center pt-12 overflow-y-auto"
+        className="h-full w-full flex flex-col items-center pt-12 overflow-y-auto pb-32 md:pb-0 px-4 md:px-0"
         id="stage"
         onClick={handleStageClick}
       >
@@ -481,14 +508,14 @@ const JournalView = ({
           }`}
         ></div>
 
-        {/* Hero Container */}
+        {/* Hero Container - Hide on Mobile if showing todos */}
         <div
           className={`text-center mb-10 cursor-default transition-opacity duration-800 ${
             zenMode
               ? "opacity-0 pointer-events-none hover:opacity-100 hover:pointer-events-auto"
               : showTodos
-              ? "opacity-20 pointer-events-none"
-              : ""
+              ? "md:opacity-20 md:pointer-events-none hidden md:block" // Hide on mobile when todos open
+              : "block"
           }`}
         >
           <div
@@ -717,10 +744,10 @@ const JournalView = ({
               +
             </button>
 
-            {/* Toggle To-Do Button */}
+            {/* Toggle To-Do Button - Desktop Only */}
             <button
               onClick={() => setShowTodos(!showTodos)}
-              className={`flex items-center justify-center h-9 px-3 rounded-lg font-['Inter'] text-sm font-medium transition-all duration-300 gap-2 ${
+              className={`hidden md:flex items-center justify-center h-9 px-3 rounded-lg font-['Inter'] text-sm font-medium transition-all duration-300 gap-2 ${
                 zenMode
                   ? "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
                   : showTodos
@@ -734,73 +761,31 @@ const JournalView = ({
             </button>
           </div>
 
-          {/* Collapsible To-Do Section */}
-          <div
-            className={`transition-all duration-500 overflow-hidden ${
-              showTodos
-                ? "max-h-[500px] opacity-100 mb-6"
-                : "max-h-0 opacity-0 mb-0"
-            }`}
-          >
-            <div className="bg-gray-50/50 rounded-xl p-6 border border-gray-100">
-              <div className="relative mb-4">
-                <input
-                  type="text"
-                  value={newTodo}
-                  onChange={(e) => setNewTodo(e.target.value)}
-                  onKeyDown={handleAddTodo}
-                  placeholder="Add a new task..."
-                  className="w-full bg-transparent border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition-colors"
-                />
-              </div>
-              <ul className="list-none p-0 m-0 max-h-[300px] overflow-y-auto">
-                {todos.length === 0 && (
-                  <li className="text-sm text-gray-400 italic text-center py-2">
-                    No tasks added yet.
-                  </li>
-                )}
-                {todos.map((todo) => (
-                  <li
-                    key={todo.id}
-                    className="flex items-start gap-3 mb-2 last:mb-0 group animate-fadeIn"
-                  >
-                    <button
-                      onClick={() => toggleTodo(todo.id)}
-                      className={`mt-0.5 min-w-[16px] h-4 rounded border flex items-center justify-center transition-all duration-200 ${
-                        todo.completed
-                          ? "bg-black border-black text-white"
-                          : "border-gray-300 hover:border-black"
-                      }`}
-                    >
-                      {todo.completed && <span className="text-[10px]">✓</span>}
-                    </button>
-                    <span
-                      className={`text-sm flex-1 leading-tight transition-all duration-200 ${
-                        todo.completed
-                          ? "text-gray-400 line-through decoration-gray-300"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      {todo.text}
-                    </span>
-                    <button
-                      onClick={() => deleteTodo(todo.id)}
-                      className="text-gray-300 hover:text-red-500 opacity-100 transition-all duration-200 px-2"
-                      title="Delete task"
-                    >
-                      🗑️
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          {/* Task Panel (Desktop Collapsible) */}
+          <TaskPanel
+            showTodos={showTodos}
+            zenMode={zenMode}
+            todos={todos}
+            onAddTodo={handleAddTodo}
+            onToggleTodo={toggleTodo}
+            onDeleteTodo={deleteTodo}
+            habits={habits}
+            onAddHabit={onAddHabit}
+            onUpdateHabit={onUpdateHabit}
+            onDeleteHabit={onDeleteHabit}
+          />
 
-          {/* Toolbar */}
+          {/* Toolbar - Hide on Mobile if showing todos */}
           <div
-            className={`flex gap-2 mb-5 border-b pb-4 transition-all duration-500 ${
-              zenMode ? "border-white/15" : "border-black/10"
-            } ${showTodos ? "opacity-20 pointer-events-none" : "opacity-100"}`}
+            className={`flex gap-2 mb-5 border-b pb-4 transition-all duration-500 sticky top-0 z-40 px-2 pt-2 -mx-2 backdrop-blur-md rounded-b-xl ${
+              zenMode
+                ? "border-white/15 bg-[#050505]/80"
+                : "border-black/10 bg-white/80"
+            } ${
+              showTodos
+                ? "md:opacity-20 md:pointer-events-none hidden md:flex"
+                : "opacity-100"
+            }`}
           >
             <button
               className={`fmt-btn bg-transparent border border-transparent font-['Inter'] text-sm font-medium cursor-pointer px-3 py-1 rounded-md transition-all duration-200 relative ${
@@ -812,6 +797,7 @@ const JournalView = ({
                   ? "text-gray-600 hover:bg-gray-800 hover:text-white"
                   : "text-gray-400 hover:bg-gray-200 hover:text-black"
               }`}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => format("bold")}
               title="Bold (Ctrl+B)"
             >
@@ -827,6 +813,7 @@ const JournalView = ({
                   ? "text-gray-600 hover:bg-gray-800 hover:text-white"
                   : "text-gray-400 hover:bg-gray-200 hover:text-black"
               }`}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => format("italic")}
               title="Italic (Ctrl+I)"
             >
@@ -842,10 +829,27 @@ const JournalView = ({
                   ? "text-gray-600 hover:bg-gray-800 hover:text-white"
                   : "text-gray-400 hover:bg-gray-200 hover:text-black"
               }`}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => format("formatBlock", "H2")}
               title="Heading (Ctrl+H)"
             >
               H1
+            </button>
+            <button
+              className={`fmt-btn bg-transparent border border-transparent font-['Inter'] text-sm font-medium cursor-pointer px-3 py-1 rounded-md transition-all duration-200 relative ${
+                formatState.blockquote
+                  ? zenMode
+                    ? "bg-white text-black shadow-[0_0_10px_rgba(255,255,255,0.3)]"
+                    : "bg-black text-white font-bold"
+                  : zenMode
+                  ? "text-gray-600 hover:bg-gray-800 hover:text-white"
+                  : "text-gray-400 hover:bg-gray-200 hover:text-black"
+              }`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => format("formatBlock", "BLOCKQUOTE")}
+              title="Quote"
+            >
+              ❝
             </button>
             <div
               className={`w-px mx-1 ${zenMode ? "bg-white/15" : "bg-black/10"}`}
@@ -860,6 +864,7 @@ const JournalView = ({
                   ? "text-gray-600 hover:bg-gray-800 hover:text-white"
                   : "text-gray-400 hover:bg-gray-200 hover:text-black"
               }`}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => format("justifyLeft")}
               title="Align Left (Ctrl+L)"
             >
@@ -875,6 +880,7 @@ const JournalView = ({
                   ? "text-gray-600 hover:bg-gray-800 hover:text-white"
                   : "text-gray-400 hover:bg-gray-200 hover:text-black"
               }`}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => format("justifyCenter")}
               title="Align Center (Ctrl+E)"
             >
@@ -896,6 +902,7 @@ const JournalView = ({
                     : "text-gray-400 hover:bg-gray-200 hover:text-black"
                 }`}
                 onClick={() => setShowListDropdown(!showListDropdown)}
+                onMouseDown={(e) => e.preventDefault()}
                 title="Insert List"
               >
                 ≡
@@ -915,6 +922,7 @@ const JournalView = ({
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
                     onClick={() => handleListInsert("bullet")}
+                    onMouseDown={(e) => e.preventDefault()}
                   >
                     <span className="text-lg">•</span>
                     Bullet List
@@ -926,6 +934,7 @@ const JournalView = ({
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
                     onClick={() => handleListInsert("numbered")}
+                    onMouseDown={(e) => e.preventDefault()}
                   >
                     <span className="text-lg">1.</span>
                     Numbered List
@@ -937,6 +946,7 @@ const JournalView = ({
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
                     onClick={() => handleListInsert("checkbox")}
+                    onMouseDown={(e) => e.preventDefault()}
                   >
                     <span className="text-lg">☐</span>
                     Checkbox List
@@ -955,7 +965,9 @@ const JournalView = ({
               className={`outline-none min-h-[50vh] text-lg leading-relaxed ${
                 zenMode ? "text-gray-300" : "text-gray-800"
               } empty:before:content-[attr(placeholder)] empty:before:text-gray-300 transition-opacity duration-300 ${
-                showTodos ? "opacity-20 pointer-events-none" : "opacity-100"
+                showTodos
+                  ? "md:opacity-20 md:pointer-events-none hidden md:block"
+                  : "opacity-100"
               }`}
               onFocus={handleEditorFocus}
               onKeyUp={checkFormats}
@@ -981,6 +993,29 @@ const JournalView = ({
               </button>
             </div>
           )}
+        </div>
+        {/* Floating Bottom Navbar - Mobile Only */}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-full px-1.5 py-1.5 flex items-center gap-1 z-[100] md:hidden">
+          <button
+            onClick={() => setShowTodos(false)}
+            className={`px-5 py-2.5 rounded-full font-['Inter'] text-sm font-medium transition-all duration-300 ${
+              !showTodos
+                ? "bg-black text-white shadow-md"
+                : "text-gray-600 hover:text-black"
+            }`}
+          >
+            Journal
+          </button>
+          <button
+            onClick={() => setShowTodos(true)}
+            className={`px-5 py-2.5 rounded-full font-['Inter'] text-sm font-medium transition-all duration-300 ${
+              showTodos
+                ? "bg-black text-white shadow-md"
+                : "text-gray-600 hover:text-black"
+            }`}
+          >
+            Tasks
+          </button>
         </div>
       </div>
     </div>
