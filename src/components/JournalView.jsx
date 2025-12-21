@@ -11,8 +11,14 @@ import {
   deleteJournal,
   getTodosForDate,
   saveTodosForDate,
+  getUserTags,
+  saveUserTag,
+  deleteUserTag,
+  getDayTags,
+  saveDayTags,
 } from "../data/constants";
 import TaskPanel from "./TaskPanel";
+import HourView from "./HourView";
 
 const JournalView = ({
   currentYear,
@@ -34,6 +40,7 @@ const JournalView = ({
   const [activeFramework, setActiveFramework] = useState("standard");
   const [todos, setTodos] = useState([]);
   const [showTodos, setShowTodos] = useState(false);
+  const [showHourView, setShowHourView] = useState(false);
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -43,6 +50,10 @@ const JournalView = ({
   const [showJournalList, setShowJournalList] = useState(false);
   const [editingTitle, setEditingTitle] = useState(null);
   const [newTitle, setNewTitle] = useState("");
+
+  // Tags state
+  const [userTags, setUserTags] = useState([]);
+  const [dayTags, setDayTags] = useState({});
 
   // Editor state
   const [formatState, setFormatState] = useState({
@@ -82,6 +93,8 @@ const JournalView = ({
     setJournals(loadedJournals);
     const loadedTodos = getTodosForDate(dateKey);
     setTodos(loadedTodos);
+    const loadedDayTags = getDayTags(dateKey);
+    setDayTags(loadedDayTags);
 
     // Set active journal to first one or null
     if (loadedJournals.length > 0) {
@@ -101,6 +114,29 @@ const JournalView = ({
       editorRef.current.innerHTML = "";
     }
   }, [activeJournalId]);
+
+  // Load global tags on mount
+  useEffect(() => {
+    setUserTags(getUserTags());
+  }, []);
+
+  // Tag Handlers
+  const handleCreateTag = (tag) => {
+    const updated = saveUserTag(tag);
+    setUserTags(updated);
+  };
+
+  const handleDeleteTag = (tagId) => {
+    const updated = deleteUserTag(tagId);
+    setUserTags(updated);
+  };
+
+  const handleUpdateDayTags = (hour, tagId) => {
+    const updated = { ...dayTags, [hour]: tagId };
+    if (!tagId) delete updated[hour];
+    setDayTags(updated);
+    saveDayTags(dateKey, updated);
+  };
 
   // Update clock every second
   useEffect(() => {
@@ -182,12 +218,13 @@ const JournalView = ({
 
   // Todo handlers
   // Todo handlers
-  const handleAddTodo = (text) => {
+  const handleAddTodo = (text, hour = null) => {
     if (text.trim()) {
       const newItem = {
         id: Date.now(),
         text: text.trim(),
         completed: false,
+        hour: hour,
       };
       const updatedTodos = [...todos, newItem];
       setTodos(updatedTodos);
@@ -759,6 +796,20 @@ const JournalView = ({
               <span className="text-lg">✓</span>
               <span>Tasks</span>
             </button>
+
+            {/* Hour View Button */}
+            <button
+              onClick={() => setShowHourView(true)}
+              className={`flex items-center justify-center h-9 px-3 rounded-lg font-['Inter'] text-sm font-medium transition-all duration-300 gap-2 ${
+                zenMode
+                  ? "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+                  : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-black"
+              }`}
+              title="Hour View"
+            >
+              <span className="text-lg">🕒</span>
+              <span>Day</span>
+            </button>
           </div>
 
           {/* Task Panel (Desktop Collapsible) */}
@@ -1018,6 +1069,27 @@ const JournalView = ({
           </button>
         </div>
       </div>
+
+      {/* Hour View Overlay */}
+      {showHourView && (
+        <HourView
+          currentYear={currentYear}
+          currentMonth={currentMonth}
+          activeDayNum={activeDayNum}
+          onBack={() => setShowHourView(false)}
+          zenMode={zenMode}
+          todos={todos}
+          onAddTodo={handleAddTodo}
+          onToggleTodo={toggleTodo}
+          onDeleteTodo={deleteTodo}
+          // Tag Props
+          userTags={userTags}
+          dayTags={dayTags}
+          onCreateTag={handleCreateTag}
+          onDeleteTag={handleDeleteTag}
+          onUpdateDayTags={handleUpdateDayTags}
+        />
+      )}
     </div>
   );
 };

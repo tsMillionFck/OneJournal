@@ -152,3 +152,40 @@ export const saveTodosForDate = (dateKey, todos) => {
   localStorage.setItem(key, JSON.stringify(todos));
   return todos;
 };
+
+// --- Tags System ---
+
+// Global User Tags (Definitions)
+export const getUserTagsKey = () => "user_defined_tags";
+
+export const getUserTags = () => {
+  const data = localStorage.getItem(getUserTagsKey());
+  return data ? JSON.parse(data) : [];
+};
+
+export const saveUserTag = (tag) => {
+  const tags = getUserTags();
+  const updated = [...tags, tag];
+  localStorage.setItem(getUserTagsKey(), JSON.stringify(updated));
+  return updated;
+};
+
+export const deleteUserTag = (tagId) => {
+  const tags = getUserTags();
+  const updated = tags.filter((t) => t.id !== tagId);
+  localStorage.setItem(getUserTagsKey(), JSON.stringify(updated));
+  return updated;
+};
+
+// Daily Tag Allocations (Hour -> TagId)
+export const getDayTagsKey = (dateKey) => `day_tags_${dateKey}`;
+
+export const getDayTags = (dateKey) => {
+  const data = localStorage.getItem(getDayTagsKey(dateKey));
+  return data ? JSON.parse(data) : {};
+};
+
+export const saveDayTags = (dateKey, tagsMap) => {
+  localStorage.setItem(getDayTagsKey(dateKey), JSON.stringify(tagsMap));
+  return tagsMap;
+};
