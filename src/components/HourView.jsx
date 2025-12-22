@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import TaskPanel from "./TaskPanel";
 
 const HourView = ({
@@ -13,7 +13,7 @@ const HourView = ({
   onDeleteTodo,
   userTags = [],
   dayTags = {},
-  onCreateTag,
+  onCreateTag, // Used for updating tags too
   onDeleteTag,
   onUpdateDayTags,
 }) => {
@@ -23,9 +23,128 @@ const HourView = ({
   const [showTagCreator, setShowTagCreator] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState("#000000");
+  // Time Format State
+  const [is24Hour, setIs24Hour] = useState(false);
+
+  // Data Mode State (Template vs Specific Day)
+  const [isSpecificDay, setIsSpecificDay] = useState(false);
+  const [templateTags, setTemplateTags] = useState(() => {
+    try {
+      const saved = localStorage.getItem("hourViewTemplateTags");
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  // Save template tags whenever they change
+  useEffect(() => {
+    localStorage.setItem("hourViewTemplateTags", JSON.stringify(templateTags));
+  }, [templateTags]);
+
+  const handleUpdateTemplateTags = (key, tagId) => {
+    const updated = { ...templateTags, [key]: tagId };
+    if (!tagId) delete updated[key];
+    setTemplateTags(updated);
+  };
+
+  // Derived Active Tags and Handler
+  const activeTags = isSpecificDay ? dayTags : templateTags;
+  const handleActiveUpdateTags = isSpecificDay
+    ? onUpdateDayTags
+    : handleUpdateTemplateTags;
+
+  // Notification Mode State
+  const [notificationMode, setNotificationMode] = useState(false);
 
   const longPressTimer = useRef(null);
   const isLongPress = useRef(false);
+
+  // Request notification permission on mount
+  React.useEffect(() => {
+    if ("Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Real-time notification checker (Always checks activeTags? Or always specific day?)
+  // User request: "create a notification Tag chip... when the sleep is going to 20 mint... then it send the task"
+  // If I'm using "Average Day" as my planner, I probably want notifications based on THAT.
+  // But if I override for a specific day, I want THAT.
+  // HOWEVER, the `HourView` is often closed.
+  // If `HourView` is closed, where does the notification check run?
+  // It runs inside `HourView`. so Notifications only work if `HourView` is OPEN.
+  // The user didn't specify persistent background notifications (which would require Service Worker or JournalView lifting).
+  // Assuming checking against `activeTags` is correct for the current view.
+  // BUT, usually notifications imply "My Schedule for TODAY".
+  // So arguably, the notification checker should ALWAYS check the specific day's tags if they exist, or the template if not?
+  // Or maybe it should just check `dayTags` (Specific) because `JournalView` passes the *current day's* tags.
+  // Valid point: The user said "make the data local... not for every day".
+  // If I set a schedule in "Average Day", I expect it to apply to today unless I overrode it.
+  // But our data model `dayTags` is empty by default.
+  // So `JournalView` doesn't "inherit" template tags.
+  // For now, I will align notifications with the *visible* tags strings.
+
+  React.useEffect(() => {
+    const checkNotifications = () => {
+      if (Notification.permission !== "granted") return;
+
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentTotalMinutes = currentHour * 60 + currentMinute;
+
+      // Identify tags that have notifications enabled
+      const notifiedTagIds = userTags.filter((t) => t.notify).map((t) => t.id);
+
+      if (notifiedTagIds.length === 0) return;
+
+      // Use activeTags for notifications so what you see is what you get alerted on
+      const sourceTags = activeTags;
+
+      const sortedKeys = Object.keys(sourceTags).sort((a, b) => {
+        const [h1, s1] = a.split("-").map(Number);
+        const [h2, s2] = b.split("-").map(Number);
+        return h1 * 60 + s1 * 12 - (h2 * 60 + s2 * 12);
+      });
+
+      // Iterate and find transitions
+      sortedKeys.forEach((key) => {
+        const tagId = sourceTags[key];
+        if (!notifiedTagIds.includes(tagId)) return;
+
+        const [h, s] = key.split("-").map(Number);
+        const slotStartMinutes = h * 60 + s * 12;
+
+        // Check if this is the start of a block
+        // Look at previous slot
+        let prevKey;
+        if (s === 0) {
+          prevKey = `${h - 1}-4`; // Last slot of prev hour
+        } else {
+          prevKey = `${h}-${s - 1}`;
+        }
+
+        // If previous slot is the same tag, it's not a start
+        if (sourceTags[prevKey] === tagId) return;
+
+        // It is a start! Check time difference
+        const diff = slotStartMinutes - currentTotalMinutes;
+
+        const tagName = userTags.find((t) => t.id === tagId)?.name || "Task";
+
+        if (diff === 20 || diff === 5) {
+          new Notification(`Upcoming: ${tagName}`, {
+            body: `${tagName} starts in ${diff} minutes!`,
+            icon: "/favicon.ico", // Optional
+          });
+        }
+      });
+    };
+
+    const interval = setInterval(checkNotifications, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [activeTags, userTags]); // Depend on activeTags
 
   const startLongPress = (tagId) => {
     isLongPress.current = false;
@@ -42,6 +161,15 @@ const HourView = ({
   };
 
   const handleTagClick = (tagId) => {
+    if (notificationMode) {
+      // Toggle notification for this tag
+      const tag = userTags.find((t) => t.id === tagId);
+      if (tag) {
+        onCreateTag({ ...tag, notify: !tag.notify });
+      }
+      return;
+    }
+
     if (isLongPress.current) {
       // Logic handled by long press timeout
       return;
@@ -55,32 +183,59 @@ const HourView = ({
     setTagToDeleteId(null); // Clear others
   };
 
-  // Predefined colors
+  // Predefined colors (Dark Palette)
   const presetColors = [
-    "#000000",
-    "#FF3B30",
-    "#FF9500",
-    "#FFCC00",
-    "#4CD964",
-    "#5AC8FA",
-    "#007AFF",
-    "#5856D6",
-    "#FF2D55",
-    "#8E8E93",
+    "#000000", // Black
+    "#1C1C1E", // Dark Gray
+    "#2C3E50", // Midnight Blue
+    "#8B0000", // Dark Red
+    "#B22222", // Firebrick (Red)
+    "#556B2F", // Dark Olive Green
+    "#006400", // Dark Green
+    "#228B22", // Forest Green
+    "#DAA520", // Goldenrod (Yellow)
+    "#483D8B", // Dark Slate Blue
+    "#4B0082", // Indigo
+    "#800000", // Maroon
+    "#2F4F4F", // Dark Slate Gray
+    "#8B4513", // Saddle Brown
+    "#191970", // Midnight Blue
   ];
 
-  // Generate 24 hours
+  // Helper for Time of Day
+  const getTimeOfDay = (hour) => {
+    if (hour === 0) return "Midnight";
+    if (hour >= 1 && hour <= 4) return "Afternight";
+    if (hour >= 5 && hour <= 11) return "Morning";
+    if (hour >= 12 && hour <= 16) return "After-noon";
+    if (hour >= 17 && hour <= 20) return "Evening";
+    if (hour >= 21) return "Night";
+    return "";
+  };
+
+  // Generate 24 hours based on format
   const hours = Array.from({ length: 24 }, (_, i) => {
     const startObj = new Date();
     startObj.setHours(i, 0, 0, 0);
-    const timeLabel = startObj.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+
+    let timeLabel;
+    if (is24Hour) {
+      timeLabel = startObj.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+    } else {
+      // 12-hour format manually to avoid leading zeros if desired, or standard
+      const h = i % 12 || 12;
+      const ampm = i < 12 ? "AM" : "PM";
+      timeLabel = `${h} ${ampm}`;
+    }
+
     return {
       hour: i,
       label: timeLabel,
+      timeOfDay: !is24Hour ? getTimeOfDay(i) : null,
     };
   });
 
@@ -111,30 +266,41 @@ const HourView = ({
       id: Date.now().toString(),
       name: newTagName.trim(),
       color: newTagColor,
+      notify: false, // Default no notify
     };
     onCreateTag(newTag);
     setNewTagName("");
     setShowTagCreator(false);
   };
 
-  const handleHourClick = (hour) => {
+  const handleSlotClick = (hour, slotIndex, e) => {
+    e.stopPropagation(); // Prevent opening modal when clicking a slot
+
     if (selectedTagId) {
       // Painting mode
+      const key = `${hour}-${slotIndex}`;
       // Toggle off if clicking same tag, or apply new tag
-      if (dayTags[hour] === selectedTagId) {
-        onUpdateDayTags(hour, null);
+      if (activeTags[key] === selectedTagId) {
+        handleActiveUpdateTags(key, null);
       } else {
-        onUpdateDayTags(hour, selectedTagId);
+        handleActiveUpdateTags(key, selectedTagId);
       }
     } else {
-      // Opening mode
+      // If not painting, maybe opening the hour logic?
+      // For now, let's keep the hour opening to the main card click or footer
       setSelectedHour(hour);
     }
+  };
+
+  const handleHourClick = (hour) => {
+    // Opening mode
+    setSelectedHour(hour);
   };
 
   // Helper to determine text color based on background
   const getContrastColor = (hexcolor) => {
     // Simple logic: if dark, white text; if light, black text
+    if (!hexcolor) return "black";
     // Convert hex to RGB
     const r = parseInt(hexcolor.substr(1, 2), 16);
     const g = parseInt(hexcolor.substr(3, 2), 16);
@@ -160,23 +326,74 @@ const HourView = ({
               ←
             </button>
             <h2 className="font-['Playfair_Display'] text-2xl md:text-3xl font-bold">
-              Average Day
+              {isSpecificDay ? "Specific Day" : "Average Day"}
             </h2>
             <span className="text-sm font-medium opacity-50 uppercase tracking-widest hidden md:inline-block">
-              {dayDisplay}
+              {isSpecificDay ? dayDisplay : "Template"}
             </span>
+          </div>
+
+          <div className="flex gap-2">
+            {/* Specific Day Toggle */}
+            <button
+              onClick={() => setIsSpecificDay(!isSpecificDay)}
+              className={`px-3 py-1 text-xs font-bold rounded border transition-colors ${
+                isSpecificDay
+                  ? "bg-black text-white border-black"
+                  : zenMode
+                  ? "border-gray-700 hover:bg-gray-800"
+                  : "border-gray-200 hover:bg-gray-100"
+              }`}
+              title="Toggle between Average Day (Template) and Specific Date"
+            >
+              {isSpecificDay ? "Specific" : "Template"}
+            </button>
+
+            {/* Time Format Toggle */}
+            <button
+              onClick={() => setIs24Hour(!is24Hour)}
+              className={`px-3 py-1 text-xs font-bold rounded border transition-colors ${
+                zenMode
+                  ? "border-gray-700 hover:bg-gray-800"
+                  : "border-gray-200 hover:bg-gray-100"
+              }`}
+            >
+              {is24Hour ? "24H" : "AM/PM"}
+            </button>
           </div>
         </div>
 
         {/* Tags Navbar */}
         <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none">
+          {/* Notification Toggle Chip */}
+          <button
+            onClick={() => {
+              setNotificationMode(!notificationMode);
+              setSelectedTagId(null); // Clear paint selection
+            }}
+            className={`px-3 py-1 text-xs font-medium rounded-full border transition-all shrink-0 flex items-center gap-2 ${
+              notificationMode
+                ? "bg-yellow-400 text-black border-yellow-500 ring-2 ring-yellow-200"
+                : "bg-transparent border-gray-300 text-gray-500 hover:border-black hover:text-black"
+            }`}
+            title="Toggle Notification Mode"
+          >
+            <span>🔔</span>
+            <span>Notify</span>
+          </button>
+
+          <div className="w-px h-6 bg-gray-200 mx-1"></div>
+
           <span className="text-xs font-bold uppercase tracking-wider opacity-50 shrink-0">
             Tags:
           </span>
           <button
-            onClick={() => setSelectedTagId(null)}
+            onClick={() => {
+              setSelectedTagId(null);
+              setNotificationMode(false);
+            }}
             className={`px-3 py-1 text-xs font-medium rounded-full border transition-all shrink-0 ${
-              selectedTagId === null
+              selectedTagId === null && !notificationMode
                 ? "bg-black text-white border-black"
                 : "bg-transparent border-gray-300 text-gray-500 hover:border-black"
             }`}
@@ -204,6 +421,14 @@ const HourView = ({
               }}
             >
               {tag.name}
+              {/* Notification Indicator */}
+              {tag.notify && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+                </span>
+              )}
+
               {selectedTagId === tag.id && <span>✓</span>}
 
               {/* Delete Button Overlay */}
@@ -235,84 +460,114 @@ const HourView = ({
       {/* Grid Content */}
       <div className="flex-1 p-4 md:p-8 overflow-y-auto lg:overflow-hidden">
         <div className="h-full grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:grid-rows-6 xl:grid-cols-6 xl:grid-rows-4">
-          {hours.map(({ hour, label }) => {
+          {hours.map(({ hour, label, timeOfDay }) => {
             const count = getTaskCount(hour);
-            const tagId = dayTags[hour];
-            const tag = userTags.find((t) => t.id === tagId);
-            const hasTag = !!tag;
-            const textColor = hasTag ? getContrastColor(tag.color) : "inherit";
+            // We no longer have a single tag for the whole hour.
+            // visual feedback for tags is now per-slot (vertical stack).
 
             return (
               <div
                 key={hour}
-                onClick={() => handleHourClick(hour)}
-                className={`p-4 border rounded-lg flex flex-col transition-all duration-200 group relative min-h-[100px] lg:min-h-0 cursor-pointer ${
-                  hasTag
-                    ? "" /* styles handled inline */
-                    : zenMode
-                    ? "border-gray-800 bg-gray-900/50 hover:bg-gray-800"
-                    : "border-gray-200 bg-gray-50 hover:bg-white hover:shadow-sm"
+                className={`flex flex-col border-2 rounded-lg overflow-hidden transition-all duration-200 group relative h-auto ${
+                  zenMode
+                    ? "border-gray-700 bg-gray-900/50 hover:bg-black hover:border-gray-500"
+                    : "border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400 hover:shadow-sm"
                 }`}
-                style={
-                  hasTag
-                    ? {
-                        backgroundColor: tag.color,
-                        color: textColor,
-                        borderColor: tag.color,
-                      }
-                    : {}
-                }
               >
-                <div className="flex justify-between items-start">
+                {/* Header Section (Floating) */}
+                <div
+                  onClick={() => handleHourClick(hour)}
+                  className={`absolute top-0 left-0 w-full p-3 z-10 flex justify-between items-start cursor-pointer transition-all duration-300 ${
+                    selectedTagId
+                      ? "opacity-0 pointer-events-none"
+                      : "opacity-100 hover:bg-black/5"
+                  }`}
+                >
                   <div className="flex flex-col">
                     <div
-                      className={`text-xs font-semibold uppercase tracking-wider mb-2 ${
-                        hasTag
-                          ? ""
-                          : zenMode
-                          ? "text-gray-500"
-                          : "text-gray-400"
+                      className={`text-2xl font-bold uppercase tracking-wider leading-none ${
+                        zenMode ? "text-gray-500" : "text-gray-400/80"
                       }`}
-                      style={hasTag ? { opacity: 0.8 } : {}}
                     >
                       {label}
                     </div>
-                    {hasTag && (
-                      <div className="text-sm font-bold leading-tight mb-2">
-                        {tag.name}
+                    {timeOfDay && (
+                      <div
+                        className={`text-[10px] font-medium uppercase tracking-widest mt-1 ${
+                          zenMode ? "text-gray-600" : "text-gray-400/60"
+                        }`}
+                      >
+                        {timeOfDay}
                       </div>
                     )}
                   </div>
 
                   {count > 0 && (
                     <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                        hasTag
-                          ? "bg-white/20 backdrop-blur-sm"
-                          : "bg-black text-white"
-                      }`}
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full bg-black text-white self-start`}
                     >
                       {count}
                     </span>
                   )}
                 </div>
 
-                {/* Content Placeholder */}
-                <div className="flex-1 flex flex-col justify-end">
-                  {!hasTag && count === 0 ? (
-                    <div className="border-dashed border-2 border-transparent rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 group-hover:border-current transition-all text-xs text-gray-400 py-2">
-                      + Add Task
-                    </div>
-                  ) : (
-                    <div
-                      className={`text-xs truncate ${
-                        hasTag ? "" : "text-gray-500"
-                      }`}
-                      style={hasTag ? { opacity: 0.8 } : {}}
-                    >
-                      {count > 0 && `${count} task${count !== 1 ? "s" : ""}`}
-                    </div>
-                  )}
+                {/* Time Slots Section (Horizontal Rows / Vertical Columns) */}
+                {/* Added min-h to ensure the card has height since header/footer are floating */}
+                <div className="flex-1 flex flex-row w-full h-32 md:h-40">
+                  {[0, 1, 2, 3, 4].map((slotIndex) => {
+                    const key = `${hour}-${slotIndex}`;
+                    const tagId = activeTags[key];
+                    const tag = userTags.find((t) => t.id === tagId);
+                    const hasTag = !!tag;
+
+                    return (
+                      <div
+                        key={slotIndex}
+                        onClick={(e) => handleSlotClick(hour, slotIndex, e)}
+                        className={`flex-1 border-r border-gray-200/50 last:border-r-0 cursor-pointer transition-colors relative group/slot ${
+                          !hasTag && selectedTagId
+                            ? zenMode
+                              ? "hover:bg-white/10"
+                              : "hover:bg-gray-300" // Darker hover in paint mode
+                            : "hover:bg-black/5"
+                        }`}
+                        style={
+                          hasTag
+                            ? {
+                                backgroundColor: tag.color,
+                                borderColor: tag.color,
+                              }
+                            : {}
+                        }
+                        title={
+                          hasTag
+                            ? tag.name
+                            : `Min: ${slotIndex * 12} - ${(slotIndex + 1) * 12}`
+                        }
+                      >
+                        {/* Optional: Show tooltip or name on hover if large enough */}
+                        {hasTag && (
+                          <div className="hidden group-hover/slot:flex absolute inset-0 items-center justify-center text-[8px] font-bold text-white/90 break-all p-0.5 text-center leading-none">
+                            {tag.name.slice(0, 3)}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Footer Section - Add Task (Floating) */}
+                <div
+                  onClick={() => handleHourClick(hour)}
+                  className={`absolute bottom-0 left-0 w-full p-2 z-10 cursor-pointer transition-all duration-300 text-center ${
+                    selectedTagId
+                      ? "opacity-0 pointer-events-none"
+                      : "opacity-100 hover:bg-black/5"
+                  }`}
+                >
+                  <div className="text-xs text-gray-400 font-medium flex items-center justify-center gap-1 group-hover:text-black transition-colors">
+                    <span>+</span> Task
+                  </div>
                 </div>
               </div>
             );

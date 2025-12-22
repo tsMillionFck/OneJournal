@@ -1,5 +1,139 @@
 import React, { useState } from "react";
 
+const TaskItem = ({
+  todo,
+  onToggleTodo,
+  onDeleteTodo,
+  onAddSubTask,
+  onToggleSubTask,
+  onDeleteSubTask,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showSubInput, setShowSubInput] = useState(false);
+  const [subTaskText, setSubTaskText] = useState("");
+
+  const handleDoubleClick = () => {
+    setShowSubInput(true);
+    setIsExpanded(true);
+  };
+
+  const handleAddSubTask = (e) => {
+    if (e.key === "Enter" && subTaskText.trim()) {
+      onAddSubTask(todo.id, subTaskText);
+      setSubTaskText("");
+    }
+  };
+
+  return (
+    <li className="mb-2 last:mb-0 group animate-fadeIn">
+      <div className="flex items-start gap-3" onDoubleClick={handleDoubleClick}>
+        {/* Toggle / Checkbox */}
+        <button
+          onClick={() => onToggleTodo(todo.id)}
+          className={`mt-0.5 min-w-[16px] h-4 rounded border flex items-center justify-center transition-all duration-200 ${
+            todo.completed
+              ? "bg-black border-black text-white"
+              : "border-gray-300 hover:border-black"
+          }`}
+        >
+          {todo.completed && <span className="text-[10px]">✓</span>}
+        </button>
+
+        {/* Text */}
+        <span
+          className={`text-sm flex-1 leading-tight transition-all duration-200 cursor-pointer ${
+            todo.completed
+              ? "text-gray-400 line-through decoration-gray-300"
+              : "text-gray-700"
+          }`}
+          title="Double click to add sub-task"
+        >
+          {todo.text}
+        </span>
+
+        {/* Dropdown Toggle for Subtasks */}
+        {todo.subTasks && todo.subTasks.length > 0 && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-gray-400 hover:text-black text-[10px] px-1"
+          >
+            {isExpanded ? "▼" : "▶"}
+          </button>
+        )}
+
+        {/* Delete */}
+        <button
+          onClick={() => onDeleteTodo(todo.id)}
+          className="text-gray-300 hover:text-red-500 opacity-100 transition-all duration-200 px-2"
+          title="Delete task"
+        >
+          🗑️
+        </button>
+      </div>
+
+      {/* Subtasks Container */}
+      {(isExpanded || showSubInput) && (
+        <div className="pl-7 mt-2 space-y-2">
+          {/* Subtask List */}
+          {todo.subTasks?.map((st) => (
+            <div
+              key={st.id}
+              className="flex items-center gap-2 text-xs text-gray-600"
+            >
+              <button
+                onClick={() => onToggleSubTask(todo.id, st.id)}
+                className={`w-3 h-3 rounded border flex items-center justify-center ${
+                  st.completed
+                    ? "bg-gray-600 border-gray-600 text-white"
+                    : "border-gray-300"
+                }`}
+              >
+                {st.completed && <span className="text-[8px]">✓</span>}
+              </button>
+              <span
+                className={st.completed ? "line-through text-gray-400" : ""}
+              >
+                {st.text}
+              </span>
+              <button
+                onClick={() => onDeleteSubTask(todo.id, st.id)}
+                className="text-gray-300 hover:text-red-500 ml-auto opacity-0 group-hover:opacity-100"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+
+          {/* Input or Add Button */}
+          {showSubInput ? (
+            <div className="flex items-center gap-2">
+              <span className="text-gray-300 text-xs">↳</span>
+              <input
+                className="bg-transparent border-b border-gray-200 text-xs w-full outline-none focus:border-black"
+                placeholder="Sub-task..."
+                value={subTaskText}
+                onChange={(e) => setSubTaskText(e.target.value)}
+                onKeyDown={handleAddSubTask}
+                autoFocus
+                onBlur={() => {
+                  if (!subTaskText) setShowSubInput(false);
+                }}
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowSubInput(true)}
+              className="text-[10px] text-gray-400 hover:text-black flex items-center gap-1"
+            >
+              <span>+</span> Add sub-task
+            </button>
+          )}
+        </div>
+      )}
+    </li>
+  );
+};
+
 const TaskPanel = ({
   showTodos,
   zenMode,
@@ -11,7 +145,11 @@ const TaskPanel = ({
   onAddHabit,
   onUpdateHabit,
   onDeleteHabit,
+
   hideHabits = false,
+  onAddSubTask,
+  onToggleSubTask,
+  onDeleteSubTask,
 }) => {
   // Local state for adding new task
   const [newTodo, setNewTodo] = useState("");
@@ -48,10 +186,10 @@ const TaskPanel = ({
 
   return (
     <div
-      className={`transition-all duration-500 overflow-hidden ${
+      className={`transition-all duration-500 scrollbar-hide ${
         showTodos
-          ? "md:max-h-[500px] md:opacity-100 md:mb-6 max-h-[80vh] opacity-100 mb-6"
-          : "max-h-0 opacity-0 mb-0"
+          ? "md:max-h-[500px] md:opacity-100 md:mb-6 max-h-[80vh] opacity-100 mb-6 overflow-y-auto"
+          : "max-h-0 opacity-0 mb-0 overflow-hidden"
       }`}
     >
       <div
@@ -76,37 +214,15 @@ const TaskPanel = ({
             </li>
           )}
           {todos.map((todo) => (
-            <li
+            <TaskItem
               key={todo.id}
-              className="flex items-start gap-3 mb-2 last:mb-0 group animate-fadeIn"
-            >
-              <button
-                onClick={() => onToggleTodo(todo.id)}
-                className={`mt-0.5 min-w-[16px] h-4 rounded border flex items-center justify-center transition-all duration-200 ${
-                  todo.completed
-                    ? "bg-black border-black text-white"
-                    : "border-gray-300 hover:border-black"
-                }`}
-              >
-                {todo.completed && <span className="text-[10px]">✓</span>}
-              </button>
-              <span
-                className={`text-sm flex-1 leading-tight transition-all duration-200 ${
-                  todo.completed
-                    ? "text-gray-400 line-through decoration-gray-300"
-                    : "text-gray-700"
-                }`}
-              >
-                {todo.text}
-              </span>
-              <button
-                onClick={() => onDeleteTodo(todo.id)}
-                className="text-gray-300 hover:text-red-500 opacity-100 transition-all duration-200 px-2"
-                title="Delete task"
-              >
-                🗑️
-              </button>
-            </li>
+              todo={todo}
+              onToggleTodo={onToggleTodo}
+              onDeleteTodo={onDeleteTodo}
+              onAddSubTask={onAddSubTask}
+              onToggleSubTask={onToggleSubTask}
+              onDeleteSubTask={onDeleteSubTask}
+            />
           ))}
         </ul>
       </div>

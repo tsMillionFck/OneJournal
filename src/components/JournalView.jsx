@@ -225,11 +225,57 @@ const JournalView = ({
         text: text.trim(),
         completed: false,
         hour: hour,
+        subTasks: [], // Initialize subTasks array
       };
       const updatedTodos = [...todos, newItem];
       setTodos(updatedTodos);
       saveTodosForDate(dateKey, updatedTodos);
     }
+  };
+
+  const addSubTask = (parentId, text) => {
+    if (!text.trim()) return;
+    const updatedTodos = todos.map((t) => {
+      if (t.id === parentId) {
+        const newSubTask = {
+          id: Date.now(),
+          text: text.trim(),
+          completed: false,
+        };
+        return { ...t, subTasks: [...(t.subTasks || []), newSubTask] };
+      }
+      return t;
+    });
+    setTodos(updatedTodos);
+    saveTodosForDate(dateKey, updatedTodos);
+  };
+
+  const toggleSubTask = (parentId, subTaskId) => {
+    const updatedTodos = todos.map((t) => {
+      if (t.id === parentId) {
+        const updatedSubTasks = (t.subTasks || []).map((st) =>
+          st.id === subTaskId ? { ...st, completed: !st.completed } : st
+        );
+        return { ...t, subTasks: updatedSubTasks };
+      }
+      return t;
+    });
+    setTodos(updatedTodos);
+    saveTodosForDate(dateKey, updatedTodos);
+  };
+
+  const deleteSubTask = (parentId, subTaskId) => {
+    const updatedTodos = todos.map((t) => {
+      if (t.id === parentId) {
+        const updatedSubTasks = (t.subTasks || []).filter(
+          (st) => st.id !== subTaskId
+        );
+        return { ...t, subTasks: updatedSubTasks };
+      }
+      return t;
+    });
+    setTodos(updatedTodos);
+    saveTodosForDate(dateKey, updatedTodos);
   };
 
   const toggleTodo = (id) => {
@@ -1082,6 +1128,10 @@ const JournalView = ({
           onAddTodo={handleAddTodo}
           onToggleTodo={toggleTodo}
           onDeleteTodo={deleteTodo}
+          // Subtask props
+          onAddSubTask={addSubTask}
+          onToggleSubTask={toggleSubTask}
+          onDeleteSubTask={deleteSubTask}
           // Tag Props
           userTags={userTags}
           dayTags={dayTags}
