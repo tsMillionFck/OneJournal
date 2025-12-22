@@ -1,6 +1,31 @@
 import React, { useState, useRef, useEffect } from "react";
 import TaskPanel from "./TaskPanel";
 
+// Digital Clock Component
+const DigitalClock = ({ zenMode, is24Hour }) => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div
+      className={`font-['Inter'] font-bold text-xl tabular-nums tracking-widest ${
+        zenMode ? "text-gray-400" : "text-gray-800"
+      }`}
+    >
+      {time.toLocaleTimeString([], {
+        hour12: !is24Hour,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })}
+    </div>
+  );
+};
+
 const HourView = ({
   currentYear,
   currentMonth,
@@ -146,6 +171,46 @@ const HourView = ({
     return () => clearInterval(interval);
   }, [activeTags, userTags]); // Depend on activeTags
 
+  // Task Selection Mode State
+  const [isTaskSelectionMode, setIsTaskSelectionMode] = useState(false);
+  const [selectedTaskSlots, setSelectedTaskSlots] = useState([]); // Array of keys "hour-slot"
+  const [showTaskInput, setShowTaskInput] = useState(false);
+  const [taskInputText, setTaskInputText] = useState("");
+
+  // Keyboard shortcut for Task Selection Mode (+)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // '+' key (Shift + =) or just + on numpad
+      if (e.key === "+" || (e.shiftKey && e.key === "=")) {
+        setIsTaskSelectionMode((prev) => !prev);
+        if (!isTaskSelectionMode) {
+          setSelectedTaskSlots([]); // Reset on entry
+          setShowTaskInput(false);
+          setNotificationMode(false); // Disable other modes
+          setSelectedTagId(null);
+        }
+      }
+
+      // Enter key to confirm selection
+      if (
+        e.key === "Enter" &&
+        isTaskSelectionMode &&
+        selectedTaskSlots.length > 0
+      ) {
+        setShowTaskInput(true);
+      }
+
+      // Escape to cancel everything
+      if (e.key === "Escape") {
+        setIsTaskSelectionMode(false);
+        setSelectedTaskSlots([]);
+        setShowTaskInput(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isTaskSelectionMode, selectedTaskSlots]);
+
   const startLongPress = (tagId) => {
     isLongPress.current = false;
     longPressTimer.current = setTimeout(() => {
@@ -275,10 +340,20 @@ const HourView = ({
 
   const handleSlotClick = (hour, slotIndex, e) => {
     e.stopPropagation(); // Prevent opening modal when clicking a slot
+    const key = `${hour}-${slotIndex}`;
+
+    if (isTaskSelectionMode) {
+      // Toggle selection for task
+      if (selectedTaskSlots.includes(key)) {
+        setSelectedTaskSlots((prev) => prev.filter((k) => k !== key));
+      } else {
+        setSelectedTaskSlots((prev) => [...prev, key]);
+      }
+      return;
+    }
 
     if (selectedTagId) {
       // Painting mode
-      const key = `${hour}-${slotIndex}`;
       // Toggle off if clicking same tag, or apply new tag
       if (activeTags[key] === selectedTagId) {
         handleActiveUpdateTags(key, null);
@@ -295,6 +370,67 @@ const HourView = ({
   const handleHourClick = (hour) => {
     // Opening mode
     setSelectedHour(hour);
+  };
+
+  const handleConfirmTask = () => {
+    if (!taskInputText.trim()) return;
+
+    // Calculate time range for the task
+    // Sort slots
+    const sorted = [...selectedTaskSlots].sort((a, b) => {
+      const [h1, s1] = a.split("-").map(Number);
+      const [h2, s2] = b.split("-").map(Number);
+      return h1 * 60 + s1 * 12 - (h2 * 60 + s2 * 12);
+    });
+
+    if (sorted.length === 0) return;
+
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    const [h1, s1] = first.split("-").map(Number);
+    const [h2, s2] = last.split("-").map(Number);
+
+    // Start time
+    const date = new Date();
+    date.setHours(h1, s1 * 12, 0, 0);
+    const startTime = date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    // End time (end of last slot)
+    date.setHours(h2, (s2 + 1) * 12, 0, 0);
+    const endTime = date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const timeRange = `${startTime} - ${endTime}`;
+
+    // We call onAddTodo but we need to pass this metadata.
+    // Currently onAddTodo takes (text, hour).
+    // We might need to overload it or pass an object?
+    // let's pass text + metadata as an object if supported, or hack it?
+    // Wait, onAddTodo in JournalView uses:
+    // handleAddTodo = (text, hour = null) => { ... id: Date.now(), text: text.trim(), hour: hour ... }
+    // We want to store 'slots' or 'timeRange'.
+    // Since we can't easily change the function signature without changing JournalView,
+    // let's check if we can pass extra properties attached to 'text' (no, that's messy).
+    // We should probably assume onAddTodo can handle an object or we'll modify JournalView later.
+    // Let's pass the timeRange string as the 'hour' param for now, or better:
+    // We will perform a special call if we can.
+    // Or, let's just append the time to the text? "Task Name (10:00 - 10:12)"?
+    // The user wants "time which can be seen on hover, toast beside the cursor".
+    // This implies metadata.
+    // Let's pass { timeRange, slots: selectedTaskSlots } as the second argument (instead of just hour number).
+
+    onAddTodo(taskInputText, { timeRange, slots: selectedTaskSlots });
+
+    // Reset
+    setTaskInputText("");
+    setSelectedTaskSlots([]);
+    setShowTaskInput(false);
+    setIsTaskSelectionMode(false);
   };
 
   // Helper to determine text color based on background
@@ -333,7 +469,9 @@ const HourView = ({
             </span>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <DigitalClock zenMode={zenMode} is24Hour={is24Hour} />
+
             {/* Specific Day Toggle */}
             <button
               onClick={() => setIsSpecificDay(!isSpecificDay)}
@@ -363,13 +501,39 @@ const HourView = ({
           </div>
         </div>
 
-        {/* Tags Navbar */}
+        {/* Tags Navbar + Task Button */}
         <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none">
+          {/* New Task Selection Button */}
+          <button
+            onClick={() => {
+              setIsTaskSelectionMode(!isTaskSelectionMode);
+              if (!isTaskSelectionMode) {
+                // Entering mode
+                setSelectedTagId(null);
+                setNotificationMode(false);
+              } else {
+                // Exiting
+                setSelectedTaskSlots([]);
+              }
+            }}
+            className={`px-3 py-1 text-xs font-medium rounded-full border transition-all shrink-0 flex items-center gap-2 ${
+              isTaskSelectionMode
+                ? "bg-blue-600 text-white border-blue-600 ring-2 ring-blue-200"
+                : "bg-transparent border-gray-300 text-gray-500 hover:border-black hover:text-black"
+            }`}
+            title="Select Time Slots for Task (+)"
+          >
+            <span>Task Selection</span>
+          </button>
+
+          <div className="w-px h-6 bg-gray-200 mx-1"></div>
+
           {/* Notification Toggle Chip */}
           <button
             onClick={() => {
               setNotificationMode(!notificationMode);
-              setSelectedTagId(null); // Clear paint selection
+              setSelectedTagId(null);
+              setIsTaskSelectionMode(false);
             }}
             className={`px-3 py-1 text-xs font-medium rounded-full border transition-all shrink-0 flex items-center gap-2 ${
               notificationMode
@@ -478,7 +642,7 @@ const HourView = ({
                 <div
                   onClick={() => handleHourClick(hour)}
                   className={`absolute top-0 left-0 w-full p-3 z-10 flex justify-between items-start cursor-pointer transition-all duration-300 ${
-                    selectedTagId
+                    selectedTagId || isTaskSelectionMode
                       ? "opacity-0 pointer-events-none"
                       : "opacity-100 hover:bg-black/5"
                   }`}
@@ -519,24 +683,29 @@ const HourView = ({
                     const tagId = activeTags[key];
                     const tag = userTags.find((t) => t.id === tagId);
                     const hasTag = !!tag;
+                    const isSelectedForTask = selectedTaskSlots.includes(key);
 
                     return (
                       <div
                         key={slotIndex}
                         onClick={(e) => handleSlotClick(hour, slotIndex, e)}
                         className={`flex-1 border-r border-gray-200/50 last:border-r-0 cursor-pointer transition-colors relative group/slot ${
-                          !hasTag && selectedTagId
+                          isSelectedForTask
+                            ? "bg-blue-500/20"
+                            : !hasTag && (selectedTagId || isTaskSelectionMode)
                             ? zenMode
                               ? "hover:bg-white/10"
-                              : "hover:bg-gray-300" // Darker hover in paint mode
+                              : "hover:bg-gray-300"
                             : "hover:bg-black/5"
                         }`}
                         style={
-                          hasTag
+                          hasTag && !isSelectedForTask
                             ? {
                                 backgroundColor: tag.color,
                                 borderColor: tag.color,
                               }
+                            : isSelectedForTask
+                            ? { backgroundColor: "rgba(59, 130, 246, 0.5)" }
                             : {}
                         }
                         title={
@@ -545,6 +714,18 @@ const HourView = ({
                             : `Min: ${slotIndex * 12} - ${(slotIndex + 1) * 12}`
                         }
                       >
+                        {/* Selection Indicator */}
+                        {isSelectedForTask && (
+                          <div className="absolute inset-0 flex items-center justify-center text-white font-bold text-xs pointer-events-none">
+                            +
+                          </div>
+                        )}
+                        {/* Optional Tooltip for Task Mode */}
+                        {isTaskSelectionMode && !isSelectedForTask && (
+                          <div className="hidden group-hover/slot:flex absolute z-20 -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+                            Add to Task
+                          </div>
+                        )}
                         {/* Optional: Show tooltip or name on hover if large enough */}
                         {hasTag && (
                           <div className="hidden group-hover/slot:flex absolute inset-0 items-center justify-center text-[8px] font-bold text-white/90 break-all p-0.5 text-center leading-none">
@@ -560,7 +741,7 @@ const HourView = ({
                 <div
                   onClick={() => handleHourClick(hour)}
                   className={`absolute bottom-0 left-0 w-full p-2 z-10 cursor-pointer transition-all duration-300 text-center ${
-                    selectedTagId
+                    selectedTagId || isTaskSelectionMode
                       ? "opacity-0 pointer-events-none"
                       : "opacity-100 hover:bg-black/5"
                   }`}
@@ -574,6 +755,47 @@ const HourView = ({
           })}
         </div>
       </div>
+
+      {/* Task Input Dialog */}
+      {showTaskInput && (
+        <div className="absolute inset-0 z-[900] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div
+            className={`w-full max-w-sm p-6 rounded-xl shadow-2xl ${
+              zenMode ? "bg-gray-900" : "bg-white"
+            }`}
+          >
+            <h3 className="font-['Playfair_Display'] text-xl font-bold mb-4">
+              Add Task for Selected Time
+            </h3>
+            <p className="text-xs text-gray-400 mb-4">
+              {selectedTaskSlots.length} slots selected
+            </p>
+            <input
+              type="text"
+              placeholder="What are you doing?"
+              autoFocus
+              value={taskInputText}
+              onChange={(e) => setTaskInputText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleConfirmTask()}
+              className="w-full p-3 border rounded-lg mb-4 text-sm outline-none focus:border-black"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleConfirmTask}
+                className="flex-1 bg-black text-white py-2 rounded-lg text-sm"
+              >
+                Save Task
+              </button>
+              <button
+                onClick={() => setShowTaskInput(false)}
+                className="px-4 py-2 border rounded-lg text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tag Creator Modal */}
       {showTagCreator && (

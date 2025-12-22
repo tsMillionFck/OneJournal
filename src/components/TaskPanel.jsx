@@ -11,6 +11,8 @@ const TaskItem = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSubInput, setShowSubInput] = useState(false);
   const [subTaskText, setSubTaskText] = useState("");
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   const handleDoubleClick = () => {
     setShowSubInput(true);
@@ -24,9 +26,21 @@ const TaskItem = ({
     }
   };
 
+  const handleMouseMove = (e) => {
+    if (todo.hour && typeof todo.hour === "object" && todo.hour.timeRange) {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    }
+  };
+
   return (
-    <li className="mb-2 last:mb-0 group animate-fadeIn">
-      <div className="flex items-start gap-3" onDoubleClick={handleDoubleClick}>
+    <li className="mb-2 last:mb-0 group animate-fadeIn relative">
+      <div
+        className="flex items-start gap-3"
+        onDoubleClick={handleDoubleClick}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        onMouseMove={handleMouseMove}
+      >
         {/* Toggle / Checkbox */}
         <button
           onClick={() => onToggleTodo(todo.id)}
@@ -49,7 +63,15 @@ const TaskItem = ({
           title="Double click to add sub-task"
         >
           {todo.text}
+          {/* Static Time Badge if preferred, but user asked for hover toast */}
         </span>
+
+        {/* Time Metadata Indicator - REMOVED */}
+        {/* {todo.hour && typeof todo.hour === 'object' && todo.hour.timeRange && (
+            <span className="text-[10px] bg-gray-100 text-gray-500 px-1 rounded flex items-center">
+                🕒
+            </span>
+        )} */}
 
         {/* Dropdown Toggle for Subtasks */}
         {todo.subTasks && todo.subTasks.length > 0 && (
@@ -70,6 +92,22 @@ const TaskItem = ({
           🗑️
         </button>
       </div>
+
+      {/* Floating Tooltip / Toast */}
+      {showTooltip &&
+        todo.hour &&
+        typeof todo.hour === "object" &&
+        todo.hour.timeRange && (
+          <div
+            className="fixed z-[9999] pointer-events-none bg-black text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap font-medium"
+            style={{
+              top: mousePos.y + 15,
+              left: mousePos.x + 15,
+            }}
+          >
+            {todo.hour.timeRange}
+          </div>
+        )}
 
       {/* Subtasks Container */}
       {(isExpanded || showSubInput) && (
