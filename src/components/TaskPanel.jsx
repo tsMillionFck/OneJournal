@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 const TaskItem = ({
   todo,
@@ -13,16 +13,55 @@ const TaskItem = ({
   const [subTaskText, setSubTaskText] = useState("");
   const [showTooltip, setShowTooltip] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const inputRef = useRef(null);
 
   const handleDoubleClick = () => {
     setShowSubInput(true);
     setIsExpanded(true);
   };
 
+  const isSubmitting = useRef(false);
+
+  useEffect(() => {
+    if (showSubInput && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [showSubInput, todo.subTasks?.length]);
+
   const handleAddSubTask = (e) => {
-    if (e.key === "Enter" && subTaskText.trim()) {
-      onAddSubTask(todo.id, subTaskText);
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (subTaskText.trim()) {
+        isSubmitting.current = true;
+        onAddSubTask(todo.id, subTaskText);
+        setSubTaskText("");
+
+        // Re-focus after render cycle
+        setTimeout(() => {
+          if (inputRef.current) {
+            inputRef.current.focus();
+            isSubmitting.current = false;
+          }
+        }, 10);
+      }
+    }
+    if (e.key === "Escape") {
+      setShowSubInput(false);
       setSubTaskText("");
+    }
+    if (e.key === "Backspace" && subTaskText === "") {
+      setShowSubInput(false);
+    }
+  };
+
+  const handleBlur = () => {
+    // If we are currently submitting, do NOT close the input
+    if (isSubmitting.current) return;
+
+    if (!subTaskText) {
+      setShowSubInput(false);
     }
   };
 
@@ -60,24 +99,24 @@ const TaskItem = ({
               ? "text-gray-400 line-through decoration-gray-300"
               : "text-gray-700"
           }`}
-          title="Double click to add sub-task"
+          title="Click to toggle sub-tasks, Double click to add new"
+          onClick={() => {
+            if (todo.subTasks && todo.subTasks.length > 0) {
+              setIsExpanded(!isExpanded);
+            }
+          }}
         >
           {todo.text}
-          {/* Static Time Badge if preferred, but user asked for hover toast */}
         </span>
-
-        {/* Time Metadata Indicator - REMOVED */}
-        {/* {todo.hour && typeof todo.hour === 'object' && todo.hour.timeRange && (
-            <span className="text-[10px] bg-gray-100 text-gray-500 px-1 rounded flex items-center">
-                🕒
-            </span>
-        )} */}
 
         {/* Dropdown Toggle for Subtasks */}
         {todo.subTasks && todo.subTasks.length > 0 && (
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="text-gray-400 hover:text-black text-[10px] px-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+            className="text-gray-400 hover:text-black text-[10px] px-1 self-center"
           >
             {isExpanded ? "▼" : "▶"}
           </button>
@@ -111,16 +150,16 @@ const TaskItem = ({
 
       {/* Subtasks Container */}
       {(isExpanded || showSubInput) && (
-        <div className="pl-7 mt-2 space-y-2">
+        <div className="pl-7 mt-2 space-y-1">
           {/* Subtask List */}
           {todo.subTasks?.map((st) => (
             <div
               key={st.id}
-              className="flex items-center gap-2 text-xs text-gray-600"
+              className="flex items-center gap-2 text-xs text-gray-600 group/subtask min-h-[24px] hover:bg-gray-50 rounded px-1 -mx-1"
             >
               <button
                 onClick={() => onToggleSubTask(todo.id, st.id)}
-                className={`w-3 h-3 rounded border flex items-center justify-center ${
+                className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${
                   st.completed
                     ? "bg-gray-600 border-gray-600 text-white"
                     : "border-gray-300"
@@ -129,13 +168,16 @@ const TaskItem = ({
                 {st.completed && <span className="text-[8px]">✓</span>}
               </button>
               <span
-                className={st.completed ? "line-through text-gray-400" : ""}
+                className={`flex-1 break-words ${
+                  st.completed ? "line-through text-gray-400" : ""
+                }`}
               >
                 {st.text}
               </span>
               <button
                 onClick={() => onDeleteSubTask(todo.id, st.id)}
-                className="text-gray-300 hover:text-red-500 ml-auto opacity-0 group-hover:opacity-100"
+                className="text-gray-400 hover:text-red-500 ml-2 opacity-0 group-hover/subtask:opacity-100 transition-opacity font-bold px-1"
+                title="Delete subtask"
               >
                 ×
               </button>
@@ -144,24 +186,22 @@ const TaskItem = ({
 
           {/* Input or Add Button */}
           {showSubInput ? (
-            <div className="flex items-center gap-2">
-              <span className="text-gray-300 text-xs">↳</span>
+            <div className="flex items-center gap-2 py-1">
+              <span className="text-gray-300 text-xs shrink-0">↳</span>
               <input
-                className="bg-transparent border-b border-gray-200 text-xs w-full outline-none focus:border-black"
-                placeholder="Sub-task..."
+                ref={inputRef}
+                className="bg-transparent border-b border-gray-200 text-xs w-full outline-none focus:border-black transition-colors"
+                placeholder="Sub-task... (Enter to add, Backspace to close)"
                 value={subTaskText}
                 onChange={(e) => setSubTaskText(e.target.value)}
                 onKeyDown={handleAddSubTask}
-                autoFocus
-                onBlur={() => {
-                  if (!subTaskText) setShowSubInput(false);
-                }}
+                onBlur={handleBlur}
               />
             </div>
           ) : (
             <button
               onClick={() => setShowSubInput(true)}
-              className="text-[10px] text-gray-400 hover:text-black flex items-center gap-1"
+              className="text-[10px] text-gray-400 hover:text-black flex items-center gap-1 py-1"
             >
               <span>+</span> Add sub-task
             </button>
@@ -245,7 +285,7 @@ const TaskPanel = ({
             className="w-full bg-transparent border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition-colors"
           />
         </div>
-        <ul className="list-none p-0 m-0 max-h-[60vh] md:max-h-[300px] overflow-y-auto">
+        <ul className="list-none p-0 m-0 max-h-[60vh] md:max-h-[300px] overflow-y-auto scrollbar-hide">
           {todos.length === 0 && (
             <li className="text-sm text-gray-400 italic text-center py-2">
               No tasks added yet.

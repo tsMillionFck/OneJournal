@@ -870,6 +870,9 @@ const JournalView = ({
             onAddHabit={onAddHabit}
             onUpdateHabit={onUpdateHabit}
             onDeleteHabit={onDeleteHabit}
+            onAddSubTask={addSubTask}
+            onToggleSubTask={toggleSubTask}
+            onDeleteSubTask={deleteSubTask}
           />
 
           {/* Toolbar - Hide on Mobile if showing todos */}

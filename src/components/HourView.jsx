@@ -41,6 +41,9 @@ const HourView = ({
   onCreateTag, // Used for updating tags too
   onDeleteTag,
   onUpdateDayTags,
+  onAddSubTask,
+  onToggleSubTask,
+  onDeleteSubTask,
 }) => {
   const [selectedHour, setSelectedHour] = useState(null);
   const [selectedTagId, setSelectedTagId] = useState(null); // Tag ID for painting
@@ -885,6 +888,9 @@ const HourView = ({
                 onToggleTodo={onToggleTodo}
                 onDeleteTodo={onDeleteTodo}
                 hideHabits={true} // Hide habits section
+                onAddSubTask={onAddSubTask}
+                onToggleSubTask={onToggleSubTask}
+                onDeleteSubTask={onDeleteSubTask}
               />
             </div>
           </div>
