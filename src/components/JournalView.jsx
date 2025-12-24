@@ -33,6 +33,7 @@ const JournalView = ({
   onAddHabit,
   onUpdateHabit,
   onDeleteHabit,
+  onOpenDailyLog, // New prop
 }) => {
   // State for dynamic content
   const [quote, setQuote] = useState(getRandomQuote());
@@ -1115,6 +1116,25 @@ const JournalView = ({
             }`}
           >
             Tasks
+          </button>
+        </div>
+
+        {/* Daily Log Button */}
+        <div
+          className={`w-full flex justify-center transition-all duration-500 delay-100 mt-6 ${
+            zenMode ? "opacity-0 pointer-events-none" : "opacity-100"
+          } ${showTodos ? "hidden" : "block"}`}
+        >
+          <button
+            onClick={onOpenDailyLog}
+            className="group flex flex-col items-center gap-2 text-gray-400 hover:text-black transition-colors"
+          >
+            <span className="text-2xl transition-transform group-hover:scale-110">
+              ⚡
+            </span>
+            <span className="text-xs uppercase tracking-widest font-medium">
+              Daily Log
+            </span>
           </button>
         </div>
       </div>

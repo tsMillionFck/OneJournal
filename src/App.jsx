@@ -4,6 +4,7 @@ import { useGSAP } from "@gsap/react";
 import CalendarView from "./components/CalendarView";
 import JournalView from "./components/JournalView";
 import GraphView from "./components/GraphView";
+import DailyLogView from "./components/DailyLogView";
 
 gsap.registerPlugin(useGSAP);
 
@@ -63,12 +64,14 @@ function App() {
         ? "#calendar-view"
         : currentView === "journal"
         ? "#journal-view"
-        : "#graph-view";
+        : currentView === "graph"
+        ? "#graph-view"
+        : "#daily-log-view";
 
     const exitingSelector =
       currentView === "calendar"
-        ? "#journal-view, #graph-view" // If moving to calendar, hide others
-        : "#calendar-view"; // If moving to journal/graph, hide calendar (this logic might need refinement if navigating between non-calendar views directly, but for now it's Calendar <-> Others)
+        ? "#journal-view, #graph-view, #daily-log-view"
+        : "#calendar-view";
 
     const enteringView = document.querySelector(enteringSelector);
     const exitingView = document.querySelector(exitingSelector);
@@ -104,6 +107,10 @@ function App() {
 
   const handleOpenGraph = () => {
     setCurrentView("graph");
+  };
+
+  const handleOpenDailyLog = () => {
+    setCurrentView("daily-log");
   };
 
   const handleBackToCalendar = () => {
@@ -162,6 +169,7 @@ function App() {
         onOpenGraph={handleOpenGraph}
         onChangeMonth={handleChangeMonth}
         onGoToToday={handleGoToToday}
+        onOpenDailyLog={handleOpenDailyLog}
         isActive={currentView === "calendar"}
       />
       <JournalView
@@ -177,6 +185,7 @@ function App() {
         onAddHabit={handleAddHabit}
         onUpdateHabit={handleUpdateHabit}
         onDeleteHabit={handleDeleteHabit}
+        onOpenDailyLog={handleOpenDailyLog}
       />
       <GraphView
         onBack={handleBackToCalendar}
@@ -185,6 +194,13 @@ function App() {
         onAddHabit={handleAddHabit}
         onUpdateHabit={handleUpdateHabit}
         onDeleteHabit={handleDeleteHabit}
+      />
+      <DailyLogView
+        currentYear={currentYear}
+        currentMonth={currentMonth}
+        activeDayNum={activeDayNum}
+        onBack={() => setCurrentView("journal")}
+        isActive={currentView === "daily-log"}
       />
     </div>
   );

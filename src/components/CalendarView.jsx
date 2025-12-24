@@ -12,6 +12,7 @@ const CalendarView = ({
   onChangeMonth,
   onGoToToday,
   onOpenGraph,
+  onOpenDailyLog,
   isActive,
 }) => {
   const weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -146,6 +147,12 @@ const CalendarView = ({
               onClick={onOpenGraph}
             >
               Insights
+            </button>
+            <button
+              className="bg-transparent border-none text-xs uppercase tracking-widest cursor-pointer text-gray-400 transition-all duration-300 hover:text-black hover:scale-105"
+              onClick={onOpenDailyLog}
+            >
+              Daily Log
             </button>
           </div>
         </div>

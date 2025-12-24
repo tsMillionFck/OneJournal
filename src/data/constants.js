@@ -189,3 +189,48 @@ export const saveDayTags = (dateKey, tagsMap) => {
   localStorage.setItem(getDayTagsKey(dateKey), JSON.stringify(tagsMap));
   return tagsMap;
 };
+
+// --- Daily Variable Definitions (Custom Tracking) ---
+
+export const getDailyVariablesKey = () => "daily_variable_definitions";
+
+export const getDailyVariables = () => {
+  const data = localStorage.getItem(getDailyVariablesKey());
+  return data ? JSON.parse(data) : [];
+};
+
+export const saveDailyVariable = (variable) => {
+  const vars = getDailyVariables();
+  // Update if exists, else append
+  const existingIndex = vars.findIndex((v) => v.id === variable.id);
+  let updated;
+  if (existingIndex >= 0) {
+    updated = [...vars];
+    updated[existingIndex] = variable;
+  } else {
+    updated = [...vars, variable];
+  }
+  localStorage.setItem(getDailyVariablesKey(), JSON.stringify(updated));
+  return updated;
+};
+
+export const deleteDailyVariable = (variableId) => {
+  const vars = getDailyVariables();
+  const updated = vars.filter((v) => v.id !== variableId);
+  localStorage.setItem(getDailyVariablesKey(), JSON.stringify(updated));
+  return updated;
+};
+
+// --- Daily Variable Values (Per Date) ---
+
+export const getDailyValuesKey = (dateKey) => `daily_values_${dateKey}`;
+
+export const getDailyValues = (dateKey) => {
+  const data = localStorage.getItem(getDailyValuesKey(dateKey));
+  return data ? JSON.parse(data) : {};
+};
+
+export const saveDailyValues = (dateKey, values) => {
+  localStorage.setItem(getDailyValuesKey(dateKey), JSON.stringify(values));
+  return values;
+};
