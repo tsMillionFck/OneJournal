@@ -56,6 +56,22 @@ function App() {
     }
   }, [zenMode]);
 
+  // Global key listener for shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ctrl + S: Toggle System Log
+      if (e.ctrlKey && e.key === "s") {
+        e.preventDefault();
+        setCurrentView((prev) =>
+          prev === "daily-log" ? "journal" : "daily-log"
+        );
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Handle view transitions with GSAP
   useGSAP(() => {
     // Determine entering view based on state

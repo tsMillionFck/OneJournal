@@ -1,202 +1,234 @@
 import React, { useState, useEffect } from "react";
-import {
-  getDailyVariables,
-  getDailyValues,
-  saveDailyValues,
-  formatDateKey,
-} from "../data/constants";
-import VariableManagerModal from "./VariableManagerModal";
 
-const DailyLogView = ({
-  currentYear,
-  currentMonth,
-  activeDayNum,
-  onBack,
-  isActive,
-}) => {
-  const [variables, setVariables] = useState([]);
-  const [values, setValues] = useState({});
-  const [isManagerOpen, setIsManagerOpen] = useState(false);
+const DailyLogView = ({ isActive, onBack }) => {
+  const [logs, setLogs] = useState([]);
+  const [heading, setHeading] = useState("");
+  const [description, setDescription] = useState("");
+  const [type, setType] = useState("neutral"); // 'positive', 'negative', 'neutral'
 
-  // Date constants
-  const dateKey = formatDateKey(currentYear, currentMonth, activeDayNum);
-  const dateObj = new Date(currentYear, currentMonth, activeDayNum);
-  const displayDate = dateObj.toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
+  // Load logs from localStorage on startup
   useEffect(() => {
-    if (isActive) {
-      setVariables(getDailyVariables());
-      setValues(getDailyValues(dateKey));
-    }
-  }, [isActive, dateKey, isManagerOpen]); // Reload when manager closes/updates
+    const savedLogs = localStorage.getItem("daily_logs");
+    if (savedLogs) setLogs(JSON.parse(savedLogs));
+  }, [isActive]);
 
-  const handleValueChange = (variableId, value) => {
-    const newValues = { ...values, [variableId]: value };
-    setValues(newValues);
-    saveDailyValues(dateKey, newValues);
+  // Save logs to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem("daily_logs", JSON.stringify(logs));
+  }, [logs]);
+
+  // Calculate stats
+  const stats = {
+    positive: logs.filter((l) => l.type === "positive").length,
+    negative: logs.filter((l) => l.type === "negative").length,
+    neutral: logs.filter((l) => !l.type || l.type === "neutral").length,
   };
 
-  return (
-    <div
-      id="daily-log-view"
-      className={`view-section ${
-        isActive ? "active" : "hidden"
-      } bg-gray-50 flex flex-col items-center pt-8`}
-    >
-      <VariableManagerModal
-        isOpen={isManagerOpen}
-        onClose={() => setIsManagerOpen(false)}
-      />
+  const addLog = (e) => {
+    e.preventDefault();
+    if (!heading.trim() || !description.trim()) return;
 
-      <header className="w-full max-w-4xl px-8 mb-12 flex justify-between items-center">
+    const newLog = {
+      id: Date.now(),
+      time: new Date().toLocaleString(),
+      heading: heading.toUpperCase(),
+      description: description,
+      type: type,
+    };
+
+    setLogs([newLog, ...logs]); // Newest logs first
+    setHeading("");
+    setDescription("");
+    setType("neutral");
+  };
+
+  const clearLogs = () => {
+    if (confirm("Clear all logs?")) setLogs([]);
+  };
+
+  if (!isActive) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-50 text-gray-800 p-8 flex flex-col items-center">
+      {/* Back Button */}
+      <div className="w-full max-w-4xl px-4 flex justify-between items-center mb-12">
         <button
           onClick={onBack}
           className="text-gray-400 hover:text-black transition-colors font-['Inter'] text-sm uppercase tracking-widest"
         >
           ← Back
         </button>
-        <div className="text-center">
-          <h1 className="font-['Playfair_Display'] text-4xl font-black mb-2">
-            Daily Log
-          </h1>
-          <p className="font-['Inter'] text-xs text-gray-400 uppercase tracking-widest">
-            {displayDate}
-          </p>
-        </div>
         <button
-          onClick={() => setIsManagerOpen(true)}
-          className="text-gray-400 hover:text-black transition-colors font-['Inter'] text-sm uppercase tracking-widest"
+          onClick={clearLogs}
+          className="text-gray-400 hover:text-red-500 transition-colors font-['Inter'] text-xs uppercase tracking-widest underline"
         >
-          Manage
+          Clear Logs
         </button>
-      </header>
+      </div>
 
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-10 border border-gray-100 animate-fadeIn">
-        {variables.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-400 font-['Inter'] text-sm mb-4">
-              No variables defined yet.
-            </p>
-            <p className="text-xs text-gray-300">
-              Click "Manage" (top right) to add variables.
-            </p>
+      <div className="w-full max-w-2xl">
+        <header className="mb-10 text-center">
+          <h1 className="font-['Playfair_Display'] text-4xl font-black mb-4 text-gray-900">
+            System Log
+          </h1>
+
+          {/* Scoreboard */}
+          <div className="flex justify-center gap-8 mb-4">
+            <div className="text-center">
+              <span className="block font-['Playfair_Display'] text-2xl font-bold text-gray-900">
+                {stats.positive}
+              </span>
+              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-['Inter']">
+                Positive
+              </span>
+            </div>
+            <div className="text-center">
+              <span className="block font-['Playfair_Display'] text-2xl font-bold text-gray-900">
+                {stats.negative}
+              </span>
+              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-['Inter']">
+                Negative
+              </span>
+            </div>
+            <div className="text-center">
+              <span className="block font-['Playfair_Display'] text-2xl font-bold text-gray-900">
+                {stats.neutral}
+              </span>
+              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-['Inter']">
+                Neutral
+              </span>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-12">
-            {/* Checkboxes Group */}
-            {variables.some((v) => v.type === "boolean") && (
-              <div className="animate-slideUp delay-100">
-                <h3 className="font-['Inter'] text-xs font-bold uppercase tracking-widest text-gray-400 mb-6">
-                  Checklist
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {variables
-                    .filter((v) => v.type === "boolean")
-                    .map((variable) => (
-                      <div
-                        key={variable.id}
-                        className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
-                        onClick={() =>
-                          handleValueChange(variable.id, !values[variable.id])
-                        }
-                      >
-                        <span className="font-['Playfair_Display'] text-lg font-medium text-gray-800">
-                          {variable.name}
-                        </span>
-                        <div
-                          className={`w-6 h-6 rounded border flex items-center justify-center transition-all ${
-                            values[variable.id]
-                              ? "bg-black border-black text-white"
-                              : "border-gray-300 bg-white"
-                          }`}
-                        >
-                          {values[variable.id] && (
-                            <span className="text-sm">✓</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
 
-            {/* Scales Group */}
-            {variables.some((v) => v.type === "scale") && (
-              <div className="animate-slideUp delay-200">
-                <h3 className="font-['Inter'] text-xs font-bold uppercase tracking-widest text-gray-400 mb-6">
-                  Scales (1-10)
-                </h3>
-                <div className="space-y-6">
-                  {variables
-                    .filter((v) => v.type === "scale")
-                    .map((variable) => (
-                      <div key={variable.id}>
-                        <div className="flex justify-between mb-3">
-                          <span className="font-['Playfair_Display'] text-xl font-medium text-gray-800">
-                            {variable.name}
-                          </span>
-                          <span className="font-['Inter'] text-2xl font-bold">
-                            {values[variable.id] || "-"}
-                          </span>
-                        </div>
-                        <div className="flex justify-between gap-1">
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                            <button
-                              key={num}
-                              onClick={() =>
-                                handleValueChange(variable.id, num)
-                              }
-                              className={`flex-1 aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-all ${
-                                values[variable.id] === num
-                                  ? "bg-black text-white scale-110 shadow-lg"
-                                  : "bg-gray-50 text-gray-400 hover:bg-gray-200 hover:text-black"
-                              }`}
-                            >
-                              {num}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
+          <p className="font-['Inter'] text-xs text-gray-400 uppercase tracking-widest">
+            {logs.length} Total Entries • Operational
+          </p>
+        </header>
 
-            {/* Text Entries Group */}
-            {variables.some((v) => v.type === "string") && (
-              <div className="animate-slideUp delay-300">
-                <h3 className="font-['Inter'] text-xs font-bold uppercase tracking-widest text-gray-400 mb-6">
-                  Notes
-                </h3>
-                <div className="grid grid-cols-1 gap-6">
-                  {variables
-                    .filter((v) => v.type === "string")
-                    .map((variable) => (
-                      <div key={variable.id}>
-                        <label className="block font-['Playfair_Display'] text-lg font-medium text-gray-800 mb-2">
-                          {variable.name}
-                        </label>
-                        <input
-                          type="text"
-                          value={values[variable.id] || ""}
-                          onChange={(e) =>
-                            handleValueChange(variable.id, e.target.value)
-                          }
-                          placeholder="Type here..."
-                          className="w-full bg-gray-50 border-b-2 border-transparent focus:border-black px-4 py-3 rounded-t-lg outline-none font-['Inter'] transition-all hover:bg-gray-100"
-                        />
-                      </div>
-                    ))}
-                </div>
+        <form
+          onSubmit={addLog}
+          className="mb-16 bg-white p-8 rounded-2xl shadow-xl border border-gray-100"
+        >
+          <div className="space-y-6">
+            <div>
+              <label className="block font-['Inter'] text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold">
+                Log Heading
+              </label>
+              <input
+                type="text"
+                value={heading}
+                onChange={(e) => setHeading(e.target.value)}
+                placeholder="E.G. SERVER_DEPLOYMENT_01"
+                className="w-full bg-gray-50 border-b-2 border-transparent focus:border-black px-4 py-3 rounded-lg outline-none font-['Inter'] text-sm transition-all hover:bg-gray-100"
+              />
+            </div>
+
+            {/* Type Selector */}
+            <div>
+              <label className="block font-['Inter'] text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold">
+                Sentiment
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setType("positive")}
+                  className={`flex-1 py-2 rounded-lg text-xs uppercase tracking-widest font-bold border transition-all ${
+                    type === "positive"
+                      ? "bg-black text-white border-black"
+                      : "bg-white text-gray-400 border-gray-200 hover:border-gray-400"
+                  }`}
+                >
+                  Positive
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setType("neutral")}
+                  className={`flex-1 py-2 rounded-lg text-xs uppercase tracking-widest font-bold border transition-all ${
+                    type === "neutral"
+                      ? "bg-black text-white border-black"
+                      : "bg-white text-gray-400 border-gray-200 hover:border-gray-400"
+                  }`}
+                >
+                  Neutral
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setType("negative")}
+                  className={`flex-1 py-2 rounded-lg text-xs uppercase tracking-widest font-bold border transition-all ${
+                    type === "negative"
+                      ? "bg-black text-white border-black"
+                      : "bg-white text-gray-400 border-gray-200 hover:border-gray-400"
+                  }`}
+                >
+                  Negative
+                </button>
               </div>
-            )}
+            </div>
+
+            <div>
+              <label className="block font-['Inter'] text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold">
+                Details
+              </label>
+              <textarea
+                rows="3"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Enter log data here..."
+                className="w-full bg-gray-50 border-b-2 border-transparent focus:border-black px-4 py-3 rounded-lg outline-none font-['Inter'] text-sm transition-all hover:bg-gray-100"
+              ></textarea>
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-black text-white font-['Inter'] font-bold py-3 rounded-lg text-xs uppercase tracking-[0.2em] transition-all hover:bg-gray-800 active:scale-95 shadow-md"
+            >
+              Add Entry
+            </button>
           </div>
-        )}
+        </form>
+
+        <div className="space-y-0 relative">
+          {/* Vertical line connecting all nodes */}
+          <div className="absolute left-[19px] top-6 bottom-6 w-px bg-gray-200 z-0"></div>
+
+          {logs.map((log) => (
+            <div key={log.id} className="relative pl-12 py-2 group">
+              {/* Node dot */}
+              <div className="absolute left-[15px] top-[28px] w-2.5 h-2.5 bg-white border-2 border-gray-300 rounded-full z-10 group-hover:border-black transition-colors shadow-sm"></div>
+
+              <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-md transition-shadow relative z-10">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className="font-['Inter'] text-[10px] uppercase tracking-widest text-gray-400 bg-gray-50 px-2 py-1 rounded">
+                      {log.time}
+                    </span>
+                  </div>
+                  {/* Sentiment Icon */}
+                  <div className="text-gray-400">
+                    {log.type === "positive" && <span title="Positive">✓</span>}
+                    {log.type === "negative" && <span title="Negative">×</span>}
+                    {(!log.type || log.type === "neutral") && (
+                      <span title="Neutral">○</span>
+                    )}
+                  </div>
+                </div>
+                <h3 className="font-['Playfair_Display'] text-xl font-bold text-gray-900 mb-2">
+                  {log.heading}
+                </h3>
+                <p className="font-['Lora'] text-gray-600 leading-relaxed text-sm">
+                  {log.description}
+                </p>
+              </div>
+            </div>
+          ))}
+
+          {logs.length === 0 && (
+            <div className="text-center py-20">
+              <p className="font-['Inter'] text-sm text-gray-400">
+                No system logs recorded yet.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
