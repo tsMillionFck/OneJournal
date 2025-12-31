@@ -53,6 +53,19 @@ const HourView = ({
   const [newTagColor, setNewTagColor] = useState("#000000");
   // Time Format State
   const [is24Hour, setIs24Hour] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    // Sync with second
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Check if viewing today
+  const isToday =
+    currentTime.getDate() === activeDayNum &&
+    currentTime.getMonth() === currentMonth &&
+    currentTime.getFullYear() === currentYear;
 
   // Data Mode State (Template vs Specific Day)
   const [isSpecificDay, setIsSpecificDay] = useState(false);
@@ -641,6 +654,28 @@ const HourView = ({
                     : "border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400 hover:shadow-sm"
                 }`}
               >
+                {isToday && hour === currentTime.getHours() && (
+                  <div
+                    className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-50 pointer-events-none transition-all duration-300 ease-out shadow-[0_0_8px_rgba(239,68,68,0.6)]"
+                    style={{
+                      left: `${
+                        ((currentTime.getMinutes() +
+                          currentTime.getSeconds() / 60) /
+                          60) *
+                        100
+                      }%`,
+                    }}
+                  >
+                    <div className="absolute top-1 -translate-x-1/2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm">
+                      {currentTime.toLocaleTimeString([], {
+                        hour12: !is24Hour,
+                        hour: "numeric",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}
+                    </div>
+                  </div>
+                )}
                 {/* Header Section (Floating) */}
                 <div
                   onClick={() => handleHourClick(hour)}

@@ -5,6 +5,9 @@ const DailyLogPanel = ({ isActive }) => {
   const [heading, setHeading] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("neutral"); // 'positive', 'negative', 'neutral'
+  const [currentTime, setCurrentTime] = useState(
+    new Date().toLocaleTimeString()
+  );
 
   // Load logs from localStorage on startup
   useEffect(() => {
@@ -16,6 +19,17 @@ const DailyLogPanel = ({ isActive }) => {
   useEffect(() => {
     localStorage.setItem("daily_logs", JSON.stringify(logs));
   }, [logs]);
+
+  // Update time every second
+  useEffect(() => {
+    if (!isActive) return;
+
+    setCurrentTime(new Date().toLocaleTimeString());
+    const timer = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isActive]);
 
   // Calculate stats
   const stats = {
@@ -60,12 +74,17 @@ const DailyLogPanel = ({ isActive }) => {
               {logs.length} Entries Recorded
             </p>
           </div>
-          <button
-            onClick={clearLogs}
-            className="text-gray-400 hover:text-red-500 transition-colors font-['Inter'] text-[10px] uppercase tracking-widest"
-          >
-            Clear
-          </button>
+          <div className="flex flex-col items-end">
+            <span className="font-['Inter'] text-[10px] text-gray-400 uppercase tracking-widest mb-1">
+              {currentTime}
+            </span>
+            <button
+              onClick={clearLogs}
+              className="text-gray-400 hover:text-red-500 transition-colors font-['Inter'] text-[10px] uppercase tracking-widest"
+            >
+              Clear
+            </button>
+          </div>
         </div>
 
         {/* Scoreboard */}
