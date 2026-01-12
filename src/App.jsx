@@ -5,12 +5,30 @@ import CalendarView from "./components/CalendarView";
 import JournalView from "./components/JournalView";
 import GraphView from "./components/GraphView";
 import DailyLogView from "./components/DailyLogView";
+import Onboarding from "./components/Onboarding";
 
 gsap.registerPlugin(useGSAP);
 
 function App() {
   // View state
   const [currentView, setCurrentView] = useState("calendar");
+
+  // Onboarding state
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem(
+      "one-journal-onboarding-seen"
+    );
+    if (!hasSeenOnboarding) {
+      setShowOnboarding(true);
+    }
+  }, []);
+
+  const handleOnboardingComplete = () => {
+    localStorage.setItem("one-journal-onboarding-seen", "true");
+    setShowOnboarding(false);
+  };
 
   // Date state
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -218,6 +236,7 @@ function App() {
         onBack={() => setCurrentView("journal")}
         isActive={currentView === "daily-log"}
       />
+      {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
     </div>
   );
 }
