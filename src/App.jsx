@@ -1,6 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import Auth from "./pages/Auth";
+import Profile from "./pages/Profile";
+
+// Components
 import CalendarView from "./components/CalendarView";
 import JournalView from "./components/JournalView";
 import GraphView from "./components/GraphView";
@@ -9,7 +15,7 @@ import Onboarding from "./components/Onboarding";
 
 gsap.registerPlugin(useGSAP);
 
-function App() {
+function Dashboard() {
   // View state
   const [currentView, setCurrentView] = useState("calendar");
 
@@ -238,6 +244,20 @@ function App() {
       />
       {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/profile" element={<Profile />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 
