@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import confetti from "canvas-confetti";
+import HabitSuccessModal from "./HabitSuccessModal";
 
 const GraphView = ({
   onBack,
@@ -8,8 +9,11 @@ const GraphView = ({
   onAddHabit,
   onUpdateHabit,
   onDeleteHabit,
+  onAddReflection,
 }) => {
   const [showForm, setShowForm] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [completedHabit, setCompletedHabit] = useState(null);
   const [newHabit, setNewHabit] = useState({
     name: "",
     m: 1, // Velocity (units per day)
@@ -142,10 +146,13 @@ const GraphView = ({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-20">
           {habits.map((h) => (
             <HabitCard
-              key={h.id}
               habit={h}
               onStep={() => updateX(h.id)}
               onDelete={() => deleteHabit(h.id)}
+              onComplete={(h) => {
+                setCompletedHabit(h);
+                setShowSuccessModal(true);
+              }}
             />
           ))}
           {habits.length === 0 && !showForm && (
@@ -163,11 +170,21 @@ const GraphView = ({
           )}
         </div>
       </main>
+      {showSuccessModal && completedHabit && (
+        <HabitSuccessModal
+          habit={completedHabit}
+          onClose={() => setShowSuccessModal(false)}
+          onSave={(id, text) => {
+            onAddReflection(id, text);
+            setShowSuccessModal(false);
+          }}
+        />
+      )}
     </div>
   );
 };
 
-const HabitCard = ({ habit, onStep, onDelete }) => {
+const HabitCard = ({ habit, onStep, onDelete, onComplete }) => {
   const currentY = habit.m * habit.x + parseFloat(habit.b);
   const totalDaysNeeded = Math.ceil((habit.goal - habit.b) / habit.m);
   const daysLeft = Math.max(0, totalDaysNeeded - habit.x);
@@ -315,12 +332,7 @@ const HabitCard = ({ habit, onStep, onDelete }) => {
           const nextX = habit.x + 1;
           const nextY = habit.m * nextX + parseFloat(habit.b);
           if (nextY >= habit.goal) {
-            confetti({
-              particleCount: 100,
-              spread: 70,
-              origin: { y: 0.6 },
-              zIndex: 99999,
-            });
+            onComplete(habit);
           }
           onStep();
         }}

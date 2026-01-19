@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import confetti from "canvas-confetti";
+import HabitSuccessModal from "./HabitSuccessModal";
 
 const TaskItem = ({
   todo,
@@ -229,9 +230,12 @@ const TaskPanel = ({
   onAddSubTask,
   onToggleSubTask,
   onDeleteSubTask,
+  onAddReflection,
 }) => {
   // Local state for adding new task
   const [newTodo, setNewTodo] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [completedHabit, setCompletedHabit] = useState(null);
 
   // Local state for adding new habit
   const [newHabitName, setNewHabitName] = useState("");
@@ -409,16 +413,8 @@ const TaskPanel = ({
                         const nextX = habit.x + 1;
                         const nextY = habit.m * nextX + parseFloat(habit.b);
                         if (nextY >= habit.goal) {
-                          try {
-                            confetti({
-                              particleCount: 100,
-                              spread: 70,
-                              origin: { y: 0.6 },
-                              zIndex: 99999, // Force z-index high
-                            });
-                          } catch (e) {
-                            // Confetti error handling
-                          }
+                          setCompletedHabit(habit);
+                          setShowSuccessModal(true);
                         }
                         onUpdateHabit(habit.id);
                       }}
@@ -441,6 +437,16 @@ const TaskPanel = ({
             })}
           </div>
         </div>
+      )}
+      {showSuccessModal && completedHabit && (
+        <HabitSuccessModal
+          habit={completedHabit}
+          onClose={() => setShowSuccessModal(false)}
+          onSave={(id, text) => {
+            onAddReflection(id, text);
+            setShowSuccessModal(false);
+          }}
+        />
       )}
     </div>
   );

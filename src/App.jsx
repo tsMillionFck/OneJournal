@@ -24,7 +24,7 @@ function Dashboard() {
 
   useEffect(() => {
     const hasSeenOnboarding = localStorage.getItem(
-      "one-journal-onboarding-seen"
+      "one-journal-onboarding-seen",
     );
     if (!hasSeenOnboarding) {
       setShowOnboarding(true);
@@ -61,12 +61,28 @@ function Dashboard() {
 
   const handleUpdateHabit = (id) => {
     setHabits((prev) =>
-      prev.map((h) => (h.id === id ? { ...h, x: h.x + 1 } : h))
+      prev.map((h) => (h.id === id ? { ...h, x: h.x + 1 } : h)),
     );
   };
 
   const handleDeleteHabit = (id) => {
     setHabits((prev) => prev.filter((h) => h.id !== id));
+  };
+
+  const handleAddReflection = (habitId, text) => {
+    setHabits((prev) =>
+      prev.map((h) =>
+        h.id === habitId
+          ? {
+              ...h,
+              reflections: [
+                ...(h.reflections || []),
+                { date: new Date().toISOString(), text },
+              ],
+            }
+          : h,
+      ),
+    );
   };
 
   const containerRef = useRef(null);
@@ -87,7 +103,7 @@ function Dashboard() {
       if (e.ctrlKey && e.key === "s") {
         e.preventDefault();
         setCurrentView((prev) =>
-          prev === "daily-log" ? "journal" : "daily-log"
+          prev === "daily-log" ? "journal" : "daily-log",
         );
       }
     };
@@ -103,10 +119,10 @@ function Dashboard() {
       currentView === "calendar"
         ? "#calendar-view"
         : currentView === "journal"
-        ? "#journal-view"
-        : currentView === "graph"
-        ? "#graph-view"
-        : "#daily-log-view";
+          ? "#journal-view"
+          : currentView === "graph"
+            ? "#graph-view"
+            : "#daily-log-view";
 
     const exitingSelector =
       currentView === "calendar"
@@ -120,7 +136,7 @@ function Dashboard() {
 
     // Select targets within the ENTERING view for animation
     const targets = enteringView.querySelectorAll(
-      "header, .calendar-grid, .hero-container, .editor-wrapper, .ui-control, .side-panel"
+      "header, .calendar-grid, .hero-container, .editor-wrapper, .ui-control, .side-panel",
     );
 
     // Initial state for entering elements
@@ -226,6 +242,7 @@ function Dashboard() {
         onUpdateHabit={handleUpdateHabit}
         onDeleteHabit={handleDeleteHabit}
         onOpenDailyLog={handleOpenDailyLog}
+        onAddReflection={handleAddReflection}
       />
       <GraphView
         onBack={handleBackToCalendar}
@@ -234,6 +251,7 @@ function Dashboard() {
         onAddHabit={handleAddHabit}
         onUpdateHabit={handleUpdateHabit}
         onDeleteHabit={handleDeleteHabit}
+        onAddReflection={handleAddReflection}
       />
       <DailyLogView
         currentYear={currentYear}

@@ -33,7 +33,9 @@ const JournalView = ({
   onAddHabit,
   onUpdateHabit,
   onDeleteHabit,
+
   onOpenDailyLog, // New prop
+  onAddReflection, // New prop
 }) => {
   // State for dynamic content
   const [quote, setQuote] = useState(getRandomQuote());
@@ -255,7 +257,7 @@ const JournalView = ({
     const updatedTodos = todos.map((t) => {
       if (t.id === parentId) {
         const updatedSubTasks = (t.subTasks || []).map((st) =>
-          st.id === subTaskId ? { ...st, completed: !st.completed } : st
+          st.id === subTaskId ? { ...st, completed: !st.completed } : st,
         );
         return { ...t, subTasks: updatedSubTasks };
       }
@@ -269,7 +271,7 @@ const JournalView = ({
     const updatedTodos = todos.map((t) => {
       if (t.id === parentId) {
         const updatedSubTasks = (t.subTasks || []).filter(
-          (st) => st.id !== subTaskId
+          (st) => st.id !== subTaskId,
         );
         return { ...t, subTasks: updatedSubTasks };
       }
@@ -281,7 +283,7 @@ const JournalView = ({
 
   const toggleTodo = (id) => {
     const updatedTodos = todos.map((t) =>
-      t.id === id ? { ...t, completed: !t.completed } : t
+      t.id === id ? { ...t, completed: !t.completed } : t,
     );
     setTodos(updatedTodos);
     saveTodosForDate(dateKey, updatedTodos);
@@ -317,7 +319,7 @@ const JournalView = ({
         onSetZenMode(false);
       }
     },
-    [activeJournalId, journals, dateKey, onSetZenMode]
+    [activeJournalId, journals, dateKey, onSetZenMode],
   );
 
   // Handle day change with auto-save
@@ -598,8 +600,8 @@ const JournalView = ({
             zenMode
               ? "opacity-0 pointer-events-none hover:opacity-100 hover:pointer-events-auto"
               : showTodos
-              ? "md:opacity-20 md:pointer-events-none hidden md:block" // Hide on mobile when todos open
-              : "block"
+                ? "md:opacity-20 md:pointer-events-none hidden md:block" // Hide on mobile when todos open
+                : "block"
           }`}
         >
           <div
@@ -707,8 +709,8 @@ const JournalView = ({
                                 ? "bg-gray-800"
                                 : "bg-gray-100"
                               : zenMode
-                              ? "hover:bg-gray-800"
-                              : "hover:bg-gray-50"
+                                ? "hover:bg-gray-800"
+                                : "hover:bg-gray-50"
                           }`}
                         >
                           {editingTitle === journal.id ? (
@@ -747,7 +749,7 @@ const JournalView = ({
                                   }`}
                                 >
                                   {new Date(
-                                    journal.updatedAt
+                                    journal.updatedAt,
                                   ).toLocaleTimeString("en-US", {
                                     hour: "2-digit",
                                     minute: "2-digit",
@@ -835,8 +837,8 @@ const JournalView = ({
                 zenMode
                   ? "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
                   : showTodos
-                  ? "bg-black text-white"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-black"
+                    ? "bg-black text-white"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-black"
               }`}
               title="Toggle Tasks"
             >
@@ -871,6 +873,7 @@ const JournalView = ({
             onAddHabit={onAddHabit}
             onUpdateHabit={onUpdateHabit}
             onDeleteHabit={onDeleteHabit}
+            onAddReflection={onAddReflection}
             onAddSubTask={addSubTask}
             onToggleSubTask={toggleSubTask}
             onDeleteSubTask={deleteSubTask}
@@ -895,8 +898,8 @@ const JournalView = ({
                     ? "bg-white text-black shadow-[0_0_10px_rgba(255,255,255,0.3)]"
                     : "bg-black text-white font-bold"
                   : zenMode
-                  ? "text-gray-600 hover:bg-gray-800 hover:text-white"
-                  : "text-gray-400 hover:bg-gray-200 hover:text-black"
+                    ? "text-gray-600 hover:bg-gray-800 hover:text-white"
+                    : "text-gray-400 hover:bg-gray-200 hover:text-black"
               }`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => format("bold")}
@@ -911,8 +914,8 @@ const JournalView = ({
                     ? "bg-white text-black shadow-[0_0_10px_rgba(255,255,255,0.3)]"
                     : "bg-black text-white font-bold"
                   : zenMode
-                  ? "text-gray-600 hover:bg-gray-800 hover:text-white"
-                  : "text-gray-400 hover:bg-gray-200 hover:text-black"
+                    ? "text-gray-600 hover:bg-gray-800 hover:text-white"
+                    : "text-gray-400 hover:bg-gray-200 hover:text-black"
               }`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => format("italic")}
@@ -927,8 +930,8 @@ const JournalView = ({
                     ? "bg-white text-black shadow-[0_0_10px_rgba(255,255,255,0.3)]"
                     : "bg-black text-white font-bold"
                   : zenMode
-                  ? "text-gray-600 hover:bg-gray-800 hover:text-white"
-                  : "text-gray-400 hover:bg-gray-200 hover:text-black"
+                    ? "text-gray-600 hover:bg-gray-800 hover:text-white"
+                    : "text-gray-400 hover:bg-gray-200 hover:text-black"
               }`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => format("formatBlock", "H2")}
@@ -943,8 +946,8 @@ const JournalView = ({
                     ? "bg-white text-black shadow-[0_0_10px_rgba(255,255,255,0.3)]"
                     : "bg-black text-white font-bold"
                   : zenMode
-                  ? "text-gray-600 hover:bg-gray-800 hover:text-white"
-                  : "text-gray-400 hover:bg-gray-200 hover:text-black"
+                    ? "text-gray-600 hover:bg-gray-800 hover:text-white"
+                    : "text-gray-400 hover:bg-gray-200 hover:text-black"
               }`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => format("formatBlock", "BLOCKQUOTE")}
@@ -962,8 +965,8 @@ const JournalView = ({
                     ? "bg-white text-black shadow-[0_0_10px_rgba(255,255,255,0.3)]"
                     : "bg-black text-white font-bold"
                   : zenMode
-                  ? "text-gray-600 hover:bg-gray-800 hover:text-white"
-                  : "text-gray-400 hover:bg-gray-200 hover:text-black"
+                    ? "text-gray-600 hover:bg-gray-800 hover:text-white"
+                    : "text-gray-400 hover:bg-gray-200 hover:text-black"
               }`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => format("justifyLeft")}
@@ -978,8 +981,8 @@ const JournalView = ({
                     ? "bg-white text-black shadow-[0_0_10px_rgba(255,255,255,0.3)]"
                     : "bg-black text-white font-bold"
                   : zenMode
-                  ? "text-gray-600 hover:bg-gray-800 hover:text-white"
-                  : "text-gray-400 hover:bg-gray-200 hover:text-black"
+                    ? "text-gray-600 hover:bg-gray-800 hover:text-white"
+                    : "text-gray-400 hover:bg-gray-200 hover:text-black"
               }`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => format("justifyCenter")}
@@ -999,8 +1002,8 @@ const JournalView = ({
                       ? "bg-white text-black shadow-[0_0_10px_rgba(255,255,255,0.3)]"
                       : "bg-black text-white font-bold"
                     : zenMode
-                    ? "text-gray-600 hover:bg-gray-800 hover:text-white"
-                    : "text-gray-400 hover:bg-gray-200 hover:text-black"
+                      ? "text-gray-600 hover:bg-gray-800 hover:text-white"
+                      : "text-gray-400 hover:bg-gray-200 hover:text-black"
                 }`}
                 onClick={() => setShowListDropdown(!showListDropdown)}
                 onMouseDown={(e) => e.preventDefault()}
