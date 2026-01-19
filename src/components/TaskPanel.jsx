@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import confetti from "canvas-confetti";
 
 const TaskItem = ({
   todo,
@@ -404,7 +405,23 @@ const TaskPanel = ({
                   </div>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => onUpdateHabit(habit.id)}
+                      onClick={() => {
+                        const nextX = habit.x + 1;
+                        const nextY = habit.m * nextX + parseFloat(habit.b);
+                        if (nextY >= habit.goal) {
+                          try {
+                            confetti({
+                              particleCount: 100,
+                              spread: 70,
+                              origin: { y: 0.6 },
+                              zIndex: 99999, // Force z-index high
+                            });
+                          } catch (e) {
+                            // Confetti error handling
+                          }
+                        }
+                        onUpdateHabit(habit.id);
+                      }}
                       disabled={currentY >= habit.goal}
                       className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded hover:bg-black hover:text-white hover:border-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title={`+${habit.m}`}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import confetti from "canvas-confetti";
 
 const GraphView = ({
   onBack,
@@ -310,7 +311,19 @@ const HabitCard = ({ habit, onStep, onDelete }) => {
       </div>
 
       <button
-        onClick={onStep}
+        onClick={() => {
+          const nextX = habit.x + 1;
+          const nextY = habit.m * nextX + parseFloat(habit.b);
+          if (nextY >= habit.goal) {
+            confetti({
+              particleCount: 100,
+              spread: 70,
+              origin: { y: 0.6 },
+              zIndex: 99999,
+            });
+          }
+          onStep();
+        }}
         disabled={currentY >= habit.goal}
         className="w-full bg-transparent border border-black text-black text-xs font-bold uppercase tracking-[2px] py-4 hover:bg-black hover:text-white transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-black"
       >
