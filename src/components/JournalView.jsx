@@ -383,6 +383,35 @@ const JournalView = ({
     setShowListDropdown(false);
   };
 
+  // Insert collapsible sub heading
+  const insertSubHeading = () => {
+    const id = `sh-${Date.now()}`;
+    const subHeadingHtml = `
+      <details class="sub-heading-block" open id="${id}">
+        <summary class="sub-heading-title">Sub Heading</summary>
+        <div class="sub-heading-content"><br></div>
+      </details>
+      <div><br></div>
+    `;
+    editorRef.current?.focus();
+    document.execCommand("insertHTML", false, subHeadingHtml);
+
+    // Focus inside the summary so user can type the heading text
+    requestAnimationFrame(() => {
+      const inserted = document.getElementById(id);
+      if (inserted) {
+        const summary = inserted.querySelector(".sub-heading-title");
+        if (summary) {
+          const range = document.createRange();
+          const sel = window.getSelection();
+          range.selectNodeContents(summary);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+    });
+  };
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -442,6 +471,10 @@ const JournalView = ({
             e.preventDefault();
             format("formatBlock", "BLOCKQUOTE");
             break;
+          case "j": // Shortcut for sub heading
+            e.preventDefault();
+            insertSubHeading();
+            break;
           case "enter":
             if (formatState.blockquote) {
               e.preventDefault();
@@ -454,10 +487,105 @@ const JournalView = ({
         }
       } else {
         // Non-meta keys
+
+        // Chip tag detection: @something + Enter or Space
+        if (e.key === "Enter" || e.key === " ") {
+          const sel = window.getSelection();
+          if (
+            sel &&
+            sel.rangeCount > 0 &&
+            editorRef.current?.contains(sel.anchorNode)
+          ) {
+            const node = sel.anchorNode;
+            if (node.nodeType === 3) {
+              // text node
+              const text = node.textContent;
+              const offset = sel.anchorOffset;
+              // Scan backwards from cursor to find @
+              const before = text.substring(0, offset);
+              const atIdx = before.lastIndexOf("@");
+              if (atIdx !== -1) {
+                const tagText = before.substring(atIdx + 1).trim();
+                if (tagText.length > 0 && !/\s/.test(tagText)) {
+                  e.preventDefault();
+                  const range = sel.getRangeAt(0);
+
+                  // Select the @tag text
+                  range.setStart(node, atIdx);
+                  range.setEnd(node, offset);
+                  range.deleteContents();
+
+                  // Create chip element
+                  const chip = document.createElement("span");
+                  chip.className = "chip-tag";
+                  chip.contentEditable = "false";
+                  chip.textContent = `@${tagText}`;
+
+                  // Insert chip + trailing space
+                  range.insertNode(chip);
+                  const space = document.createTextNode("\u00A0");
+                  chip.after(space);
+
+                  // Move cursor after the space
+                  const newRange = document.createRange();
+                  newRange.setStartAfter(space);
+                  newRange.collapse(true);
+                  sel.removeAllRanges();
+                  sel.addRange(newRange);
+
+                  // If Enter was pressed, also insert a line break
+                  if (e.key === "Enter") {
+                    document.execCommand("insertParagraph");
+                  }
+                  return; // skip other Enter handlers
+                }
+              }
+            }
+          }
+        }
+
         if (e.key === "Enter" && formatState.blockquote) {
           e.preventDefault();
           document.execCommand("insertParagraph");
           document.execCommand("formatBlock", false, "div");
+        }
+
+        // Tab in a list → indent (create sub-list)
+        if (e.key === "Tab") {
+          const sel = window.getSelection();
+          const node = sel?.anchorNode;
+          const li =
+            node?.nodeType === 3
+              ? node.parentElement?.closest("li")
+              : node?.closest?.("li");
+          if (li && editorRef.current?.contains(li)) {
+            e.preventDefault();
+            if (e.shiftKey) {
+              document.execCommand("outdent");
+            } else {
+              document.execCommand("indent");
+            }
+            checkFormats();
+          }
+        }
+
+        // Backspace on empty nested list item → outdent to parent
+        if (e.key === "Backspace") {
+          const sel = window.getSelection();
+          const node = sel?.anchorNode;
+          const li =
+            node?.nodeType === 3
+              ? node.parentElement?.closest("li")
+              : node?.closest?.("li");
+          if (li && editorRef.current?.contains(li)) {
+            const text = li.textContent?.trim();
+            // Only outdent if the list item is empty AND it's nested (inside a sub-list)
+            if (!text && li.parentElement?.closest("li")) {
+              e.preventDefault();
+              document.execCommand("outdent");
+              checkFormats();
+            }
+          }
         }
       }
     };
@@ -954,6 +1082,18 @@ const JournalView = ({
               title="Quote"
             >
               ❝
+            </button>
+            <button
+              className={`fmt-btn bg-transparent border border-transparent font-['Inter'] text-sm font-medium cursor-pointer px-3 py-1 rounded-md transition-all duration-200 relative ${
+                zenMode
+                  ? "text-gray-600 hover:bg-gray-800 hover:text-white"
+                  : "text-gray-400 hover:bg-gray-200 hover:text-black"
+              }`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={insertSubHeading}
+              title="Sub Heading (Ctrl+J)"
+            >
+              H2
             </button>
             <div
               className={`w-px mx-1 ${zenMode ? "bg-white/15" : "bg-black/10"}`}
