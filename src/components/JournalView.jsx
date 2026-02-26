@@ -583,8 +583,7 @@ const JournalView = ({
                   const space = document.createTextNode("\u00A0");
                   chip.after(space);
 
-                  // Chain detection: look for chip -> chip pattern
-                  // Walk backwards from the new chip to find: textNode(->), prevChip
+                  // Chain detection: look for chip [-> | => | ==] chip pattern
                   const tryBuildChain = () => {
                     let cursor = chip.previousSibling;
                     // skip whitespace-only text nodes
@@ -595,61 +594,147 @@ const JournalView = ({
                     ) {
                       cursor = cursor.previousSibling;
                     }
-                    // check for text node containing '->'
-                    if (
-                      cursor &&
-                      cursor.nodeType === 3 &&
-                      cursor.textContent.trim().endsWith("->")
+                    if (!cursor || cursor.nodeType !== 3) return false;
+
+                    const trimmed = cursor.textContent.trim();
+                    let operator = null;
+                    if (trimmed.endsWith("->")) operator = "series";
+                    else if (trimmed.endsWith("=>")) operator = "parallel";
+                    else if (trimmed.endsWith("==")) operator = "merge";
+                    if (!operator) return false;
+
+                    const arrowNode = cursor;
+                    let prev = arrowNode.previousSibling;
+                    while (
+                      prev &&
+                      prev.nodeType === 3 &&
+                      !prev.textContent.trim()
                     ) {
-                      const arrowNode = cursor;
-                      let prev = arrowNode.previousSibling;
-                      // skip whitespace
-                      while (
-                        prev &&
-                        prev.nodeType === 3 &&
-                        !prev.textContent.trim()
-                      ) {
-                        prev = prev.previousSibling;
-                      }
-                      // check if prev is a chip or an existing chain
-                      if (
-                        prev &&
-                        (prev.classList?.contains("chip-tag") ||
-                          prev.classList?.contains("chip-chain"))
-                      ) {
-                        // Build chain wrapper
-                        const isExistingChain =
-                          prev.classList.contains("chip-chain");
+                      prev = prev.previousSibling;
+                    }
+                    if (!prev) return false;
 
-                        if (isExistingChain) {
-                          // Append arrow + new chip to existing chain
-                          const arrow = document.createElement("span");
-                          arrow.className = "chain-arrow";
-                          arrow.textContent = "→";
-                          prev.appendChild(arrow);
-                          prev.appendChild(chip);
-                          // Remove the arrow text node
-                          arrowNode.remove();
-                        } else {
-                          // Create new chain: prevChip + arrow + newChip
-                          const chain = document.createElement("span");
-                          chain.className = "chip-chain";
-                          chain.contentEditable = "false";
+                    const isChip = prev.classList?.contains("chip-tag");
+                    const isChain = prev.classList?.contains("chip-chain");
+                    if (!isChip && !isChain) return false;
 
-                          const arrow = document.createElement("span");
-                          arrow.className = "chain-arrow";
-                          arrow.textContent = "→";
+                    const makeArrow = () => {
+                      const a = document.createElement("span");
+                      a.className = "chain-arrow";
+                      a.textContent = "→";
+                      return a;
+                    };
 
-                          prev.before(chain);
-                          chain.appendChild(prev);
-                          chain.appendChild(arrow);
-                          chain.appendChild(chip);
-                          // Remove the arrow text node
-                          arrowNode.remove();
+                    // ── SERIES (->)  ──
+                    if (operator === "series") {
+                      if (isChain) {
+                        const lastChild = prev.lastElementChild;
+                        // If chain ends with a parallel, add to its last branch
+                        if (lastChild?.classList?.contains("chain-parallel")) {
+                          const lastBranch = lastChild.lastElementChild;
+                          if (lastBranch?.classList?.contains("chain-branch")) {
+                            lastBranch.appendChild(makeArrow());
+                            lastBranch.appendChild(chip);
+                            arrowNode.remove();
+                            return true;
+                          }
                         }
+                        // Otherwise append to chain directly
+                        prev.appendChild(makeArrow());
+                        prev.appendChild(chip);
+                        arrowNode.remove();
+                      } else {
+                        const chain = document.createElement("span");
+                        chain.className = "chip-chain";
+                        chain.contentEditable = "false";
+                        prev.before(chain);
+                        chain.appendChild(prev);
+                        chain.appendChild(makeArrow());
+                        chain.appendChild(chip);
+                        arrowNode.remove();
+                      }
+                      return true;
+                    }
+
+                    // ── PARALLEL (=>) ──
+                    if (operator === "parallel") {
+                      if (isChain) {
+                        const lastChild = prev.lastElementChild;
+                        if (lastChild?.classList?.contains("chain-parallel")) {
+                          // Add new branch to existing parallel
+                          const branch = document.createElement("span");
+                          branch.className = "chain-branch";
+                          branch.appendChild(chip);
+                          lastChild.appendChild(branch);
+                          arrowNode.remove();
+                          return true;
+                        } else {
+                          // No parallel yet — create one
+                          // Move everything after the last chain-arrow into branch 1
+                          const arrows = prev.querySelectorAll(".chain-arrow");
+                          if (arrows.length > 0) {
+                            const lastArrowEl = arrows[arrows.length - 1];
+                            const branch1 = document.createElement("span");
+                            branch1.className = "chain-branch";
+                            let next = lastArrowEl.nextSibling;
+                            while (next) {
+                              const toMove = next;
+                              next = next.nextSibling;
+                              branch1.appendChild(toMove);
+                            }
+                            const branch2 = document.createElement("span");
+                            branch2.className = "chain-branch";
+                            branch2.appendChild(chip);
+
+                            const parallel = document.createElement("span");
+                            parallel.className = "chain-parallel";
+                            parallel.appendChild(branch1);
+                            parallel.appendChild(branch2);
+                            lastArrowEl.after(parallel);
+                            arrowNode.remove();
+                            return true;
+                          }
+                        }
+                      } else {
+                        // Standalone chip → new chain with parallel
+                        const chain = document.createElement("span");
+                        chain.className = "chip-chain";
+                        chain.contentEditable = "false";
+
+                        const branch1 = document.createElement("span");
+                        branch1.className = "chain-branch";
+                        // prev chip will be the source, chip goes in branch 1
+                        // We need a second => to create branch 2, so start with one branch
+                        branch1.appendChild(chip);
+
+                        const parallel = document.createElement("span");
+                        parallel.className = "chain-parallel";
+                        parallel.appendChild(branch1);
+
+                        prev.before(chain);
+                        chain.appendChild(prev);
+                        chain.appendChild(makeArrow());
+                        chain.appendChild(parallel);
+                        arrowNode.remove();
                         return true;
                       }
+                      return false;
                     }
+
+                    // ── MERGE (==) ──
+                    if (operator === "merge") {
+                      if (isChain) {
+                        const mergeEl = document.createElement("span");
+                        mergeEl.className = "chain-merge";
+                        mergeEl.textContent = "═";
+                        prev.appendChild(mergeEl);
+                        prev.appendChild(chip);
+                        arrowNode.remove();
+                        return true;
+                      }
+                      return false;
+                    }
+
                     return false;
                   };
                   tryBuildChain();

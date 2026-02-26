@@ -216,6 +216,53 @@ body.zen-active #editor .chip-chain .chain-arrow {
   color: #555;
 }
 
+/* Parallel branches */
+#editor .chain-parallel {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  border-left: 2px solid #bbb;
+  padding: 3px 0 3px 2px;
+  margin: 0 2px;
+  vertical-align: middle;
+}
+
+#editor .chain-branch {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+#editor .chain-branch .chip-tag {
+  font-size: 0.82em;
+}
+
+/* Merge connector */
+#editor .chain-merge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85em;
+  color: #999;
+  padding: 0 5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+body.zen-active #editor .chain-parallel {
+  border-color: #444;
+}
+
+body.zen-active #editor .chain-branch {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body.zen-active #editor .chain-merge {
+  color: #555;
+}
+
 /* Sub Heading (collapsible) */
 #editor details.sub-heading-block {
   margin: 1.5em 0;
