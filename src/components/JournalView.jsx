@@ -488,6 +488,63 @@ const JournalView = ({
       } else {
         // Non-meta keys
 
+        // Enter inside sub heading title → move to content area
+        if (e.key === "Enter") {
+          const sel = window.getSelection();
+          const node = sel?.anchorNode;
+          const summary =
+            node?.nodeType === 3
+              ? node.parentElement?.closest(".sub-heading-title")
+              : node?.closest?.(".sub-heading-title");
+          if (summary && editorRef.current?.contains(summary)) {
+            e.preventDefault();
+            const content = summary.nextElementSibling; // .sub-heading-content
+            if (content) {
+              const range = document.createRange();
+              range.selectNodeContents(content);
+              range.collapse(true); // move to start
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+            return;
+          }
+        }
+
+        // Comment detection: typing second '/' creates a comment block
+        if (e.key === "/") {
+          const sel = window.getSelection();
+          const node = sel?.anchorNode;
+          if (node?.nodeType === 3 && editorRef.current?.contains(node)) {
+            const offset = sel.anchorOffset;
+            const charBefore = node.textContent[offset - 1];
+            if (charBefore === "/") {
+              e.preventDefault();
+              const range = sel.getRangeAt(0);
+
+              // Remove the first '/'
+              range.setStart(node, offset - 1);
+              range.setEnd(node, offset);
+              range.deleteContents();
+
+              // Create comment element
+              const comment = document.createElement("span");
+              comment.className = "editor-comment";
+              comment.textContent = "\u200B"; // zero-width space so the cursor can sit inside
+
+              // Insert it
+              range.insertNode(comment);
+
+              // Place cursor inside the comment span
+              const innerRange = document.createRange();
+              innerRange.setStart(comment.firstChild, 1); // after the zero-width space
+              innerRange.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(innerRange);
+              return;
+            }
+          }
+        }
+
         // Chip tag detection: @something + Enter or Space
         if (e.key === "Enter" || e.key === " ") {
           const sel = window.getSelection();
@@ -525,6 +582,77 @@ const JournalView = ({
                   range.insertNode(chip);
                   const space = document.createTextNode("\u00A0");
                   chip.after(space);
+
+                  // Chain detection: look for chip -> chip pattern
+                  // Walk backwards from the new chip to find: textNode(->), prevChip
+                  const tryBuildChain = () => {
+                    let cursor = chip.previousSibling;
+                    // skip whitespace-only text nodes
+                    while (
+                      cursor &&
+                      cursor.nodeType === 3 &&
+                      !cursor.textContent.trim()
+                    ) {
+                      cursor = cursor.previousSibling;
+                    }
+                    // check for text node containing '->'
+                    if (
+                      cursor &&
+                      cursor.nodeType === 3 &&
+                      cursor.textContent.trim().endsWith("->")
+                    ) {
+                      const arrowNode = cursor;
+                      let prev = arrowNode.previousSibling;
+                      // skip whitespace
+                      while (
+                        prev &&
+                        prev.nodeType === 3 &&
+                        !prev.textContent.trim()
+                      ) {
+                        prev = prev.previousSibling;
+                      }
+                      // check if prev is a chip or an existing chain
+                      if (
+                        prev &&
+                        (prev.classList?.contains("chip-tag") ||
+                          prev.classList?.contains("chip-chain"))
+                      ) {
+                        // Build chain wrapper
+                        const isExistingChain =
+                          prev.classList.contains("chip-chain");
+
+                        if (isExistingChain) {
+                          // Append arrow + new chip to existing chain
+                          const arrow = document.createElement("span");
+                          arrow.className = "chain-arrow";
+                          arrow.textContent = "→";
+                          prev.appendChild(arrow);
+                          prev.appendChild(chip);
+                          // Remove the arrow text node
+                          arrowNode.remove();
+                        } else {
+                          // Create new chain: prevChip + arrow + newChip
+                          const chain = document.createElement("span");
+                          chain.className = "chip-chain";
+                          chain.contentEditable = "false";
+
+                          const arrow = document.createElement("span");
+                          arrow.className = "chain-arrow";
+                          arrow.textContent = "→";
+
+                          prev.before(chain);
+                          chain.appendChild(prev);
+                          chain.appendChild(arrow);
+                          chain.appendChild(chip);
+                          // Remove the arrow text node
+                          arrowNode.remove();
+                        }
+                        return true;
+                      }
+                    }
+                    return false;
+                  };
+                  tryBuildChain();
 
                   // Move cursor after the space
                   const newRange = document.createRange();
