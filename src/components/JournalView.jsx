@@ -77,6 +77,10 @@ const JournalView = ({
 
   const editorRef = useRef(null);
 
+  // Autosave
+  const autosaveTimerRef = useRef(null);
+  const [autosaveStatus, setAutosaveStatus] = useState(null); // null | 'saving' | 'saved'
+
   // Get the current date key for localStorage
   const dateKey = formatDateKey(currentYear, currentMonth, activeDayNum);
 
@@ -321,6 +325,25 @@ const JournalView = ({
     },
     [activeJournalId, journals, dateKey, onSetZenMode],
   );
+
+  // Debounced autosave — triggers 2s after last edit
+  const triggerAutosave = useCallback(() => {
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      setAutosaveStatus("saving");
+      saveEntry(false);
+      setAutosaveStatus("saved");
+      // Clear the "saved" indicator after 2s
+      setTimeout(() => setAutosaveStatus(null), 2000);
+    }, 2000);
+  }, [saveEntry]);
+
+  // Cleanup autosave timer on unmount or journal switch
+  useEffect(() => {
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+  }, [activeJournalId]);
 
   // Handle day change with auto-save
   const handleChangeDay = (delta) => {
@@ -923,6 +946,17 @@ const JournalView = ({
         SAVE ENTRY
       </button>
 
+      {/* Autosave indicator */}
+      {autosaveStatus === "saved" && (
+        <span
+          className={`fixed top-16 right-7 font-['Inter'] text-xs tracking-wide z-500 animate-fadeIn ${
+            zenMode ? "text-gray-500" : "text-gray-400"
+          }`}
+        >
+          ✓ Saved
+        </span>
+      )}
+
       {/* Main Journal Stage */}
       <div
         className="h-full w-full flex flex-col items-center pt-12 overflow-y-auto pb-32 md:pb-0 px-4 md:px-0"
@@ -1429,6 +1463,7 @@ const JournalView = ({
               onFocus={handleEditorFocus}
               onKeyUp={checkFormats}
               onMouseUp={checkFormats}
+              onInput={triggerAutosave}
             ></div>
           ) : (
             <div
