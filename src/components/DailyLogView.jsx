@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 
 const DailyLogView = ({ isActive, onBack }) => {
   const [logs, setLogs] = useState([]);
@@ -46,10 +47,17 @@ const DailyLogView = ({ isActive, onBack }) => {
     if (confirm("Clear all logs?")) setLogs([]);
   };
 
-  if (!isActive) return null;
-
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-50 text-gray-800 p-8 flex flex-col items-center">
+    <motion.div
+      initial={false}
+      animate={isActive ? "active" : "hidden"}
+      variants={{
+        active: { opacity: 1, pointerEvents: "auto", zIndex: 50, scale: 1 },
+        hidden: { opacity: 0, pointerEvents: "none", zIndex: 0, scale: 0.98 },
+      }}
+      transition={{ duration: 0.4, ease: "easeInOut" }}
+      className="fixed inset-0 overflow-y-auto bg-gray-50 text-gray-800 p-8 flex flex-col items-center"
+    >
       {/* Back Button */}
       <div className="w-full max-w-4xl px-4 flex justify-between items-center mb-12">
         <button
@@ -230,7 +238,7 @@ const DailyLogView = ({ isActive, onBack }) => {
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

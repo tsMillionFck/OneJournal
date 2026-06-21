@@ -19,6 +19,30 @@ function Dashboard() {
   // View state
   const [currentView, setCurrentView] = useState("calendar");
 
+  // PWA Install state
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") {
+        setDeferredPrompt(null);
+      }
+    }
+  };
+
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -260,6 +284,17 @@ function Dashboard() {
         onBack={() => setCurrentView("journal")}
         isActive={currentView === "daily-log"}
       />
+      
+      {/* PWA Install Button */}
+      {deferredPrompt && (
+        <button
+          onClick={handleInstallClick}
+          className="fixed top-4 right-4 z-50 bg-black text-white px-4 py-2 rounded-full font-['Inter'] text-sm shadow-lg hover:bg-gray-800 transition-colors"
+        >
+          Install App
+        </button>
+      )}
+
       {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
     </div>
   );

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import confetti from "canvas-confetti";
 import HabitSuccessModal from "./HabitSuccessModal";
 
@@ -39,11 +40,16 @@ const GraphView = ({
   };
 
   return (
-    <div
+    <motion.div
       id="graph-view"
-      className={`view-section ${
-        isActive ? "active" : "hidden"
-      } bg-gray-50 flex flex-col h-full absolute inset-0 w-full z-20 overflow-hidden`}
+      initial={false}
+      animate={isActive ? "active" : "hidden"}
+      variants={{
+        active: { opacity: 1, pointerEvents: "auto", zIndex: 10, scale: 1 },
+        hidden: { opacity: 0, pointerEvents: "none", zIndex: 0, scale: 0.98 },
+      }}
+      transition={{ duration: 0.4, ease: "easeInOut" }}
+      className="view-section bg-gray-50 flex flex-col h-full absolute inset-0 w-full overflow-hidden"
     >
       {/* Header */}
       <header className="px-4 md:px-15 py-6 md:py-10 flex flex-col md:flex-row justify-between items-start md:items-end border-b border-gray-200 bg-white shadow-sm z-10 shrink-0">
@@ -180,7 +186,7 @@ const GraphView = ({
           }}
         />
       )}
-    </div>
+    </motion.div>
   );
 };
 

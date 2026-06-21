@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { motion } from "framer-motion";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+import { PenLine, X, BookOpen, ChevronLeft, ChevronRight, Undo2 } from "lucide-react";
 import {
   frameworks,
   getRandomQuote,
@@ -17,8 +21,8 @@ import {
   getDayTags,
   saveDayTags,
 } from "../data/constants";
-import TaskPanel from "./TaskPanel";
-import HourView from "./HourView";
+
+
 
 const JournalView = ({
   currentYear,
@@ -41,8 +45,8 @@ const JournalView = ({
   const [quote, setQuote] = useState(getRandomQuote());
   const [prompt, setPrompt] = useState(getRandomPrompt());
   const [activeFramework, setActiveFramework] = useState("standard");
-  const [todos, setTodos] = useState([]);
-  const [showTodos, setShowTodos] = useState(false);
+  
+  
   const [showHourView, setShowHourView] = useState(false);
 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -59,6 +63,63 @@ const JournalView = ({
   const [dayTags, setDayTags] = useState({});
 
   // Editor state
+  const [isToolbarOpen, setIsToolbarOpen] = useState(false);
+  const toolbarDrawerRef = useRef(null);
+  const [pendingFormat, setPendingFormat] = useState(null); // { command, value } or { listType }
+
+  // Journal pages drawer state
+  const [isJournalDrawerOpen, setIsJournalDrawerOpen] = useState(false);
+  const journalDrawerRef = useRef(null);
+
+  useGSAP(() => {
+    if (isToolbarOpen) {
+      gsap.to(toolbarDrawerRef.current, { y: 0, duration: 0.4, ease: "power3.out" });
+    } else {
+      gsap.to(toolbarDrawerRef.current, { y: "100%", duration: 0.3, ease: "power3.in" });
+    }
+  }, [isToolbarOpen]);
+
+  // Apply pending format after drawer closes
+  useEffect(() => {
+    if (!isToolbarOpen && pendingFormat) {
+      // Small delay to let the drawer animation finish
+      const timer = setTimeout(() => {
+        if (editorRef.current && savedSelectionRef.current) {
+          editorRef.current.focus();
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(savedSelectionRef.current);
+
+          if (pendingFormat.listType) {
+            if (pendingFormat.listType === "bullet") {
+              document.execCommand("insertUnorderedList", false, null);
+            } else if (pendingFormat.listType === "numbered") {
+              document.execCommand("insertOrderedList", false, null);
+            }
+          } else {
+            document.execCommand(pendingFormat.command, false, pendingFormat.value);
+          }
+
+          // Save updated selection
+          if (sel.rangeCount > 0) {
+            savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
+          }
+          checkFormats();
+        }
+        setPendingFormat(null);
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [isToolbarOpen, pendingFormat]);
+
+  useGSAP(() => {
+    if (isJournalDrawerOpen) {
+      gsap.to(journalDrawerRef.current, { y: 0, duration: 0.4, ease: "power3.out" });
+    } else {
+      gsap.to(journalDrawerRef.current, { y: "100%", duration: 0.3, ease: "power3.in" });
+    }
+  }, [isJournalDrawerOpen]);
+
   const [formatState, setFormatState] = useState({
     bold: false,
     italic: false,
@@ -76,6 +137,25 @@ const JournalView = ({
   const journalListRef = useRef(null);
 
   const editorRef = useRef(null);
+  const savedSelectionRef = useRef(null);
+
+  // Save the current editor selection
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+      savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
+    }
+  };
+
+  // Restore the saved selection
+  const restoreSelection = () => {
+    if (savedSelectionRef.current && editorRef.current) {
+      editorRef.current.focus();
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedSelectionRef.current);
+    }
+  };
 
   // Autosave
   const autosaveTimerRef = useRef(null);
@@ -98,8 +178,7 @@ const JournalView = ({
   useEffect(() => {
     const loadedJournals = getJournalsForDate(dateKey);
     setJournals(loadedJournals);
-    const loadedTodos = getTodosForDate(dateKey);
-    setTodos(loadedTodos);
+    
     const loadedDayTags = getDayTags(dateKey);
     setDayTags(loadedDayTags);
 
@@ -223,82 +302,6 @@ const JournalView = ({
     setEditingTitle(null);
   };
 
-  // Todo handlers
-  // Todo handlers
-  const handleAddTodo = (text, hour = null) => {
-    if (text.trim()) {
-      const newItem = {
-        id: Date.now(),
-        text: text.trim(),
-        completed: false,
-        hour: hour,
-        subTasks: [], // Initialize subTasks array
-      };
-      const updatedTodos = [...todos, newItem];
-      setTodos(updatedTodos);
-      saveTodosForDate(dateKey, updatedTodos);
-    }
-  };
-
-  const addSubTask = (parentId, text) => {
-    if (!text.trim()) return;
-    const updatedTodos = todos.map((t) => {
-      if (t.id === parentId) {
-        const newSubTask = {
-          id: Date.now(),
-          text: text.trim(),
-          completed: false,
-        };
-        return { ...t, subTasks: [...(t.subTasks || []), newSubTask] };
-      }
-      return t;
-    });
-    setTodos(updatedTodos);
-    saveTodosForDate(dateKey, updatedTodos);
-  };
-
-  const toggleSubTask = (parentId, subTaskId) => {
-    const updatedTodos = todos.map((t) => {
-      if (t.id === parentId) {
-        const updatedSubTasks = (t.subTasks || []).map((st) =>
-          st.id === subTaskId ? { ...st, completed: !st.completed } : st,
-        );
-        return { ...t, subTasks: updatedSubTasks };
-      }
-      return t;
-    });
-    setTodos(updatedTodos);
-    saveTodosForDate(dateKey, updatedTodos);
-  };
-
-  const deleteSubTask = (parentId, subTaskId) => {
-    const updatedTodos = todos.map((t) => {
-      if (t.id === parentId) {
-        const updatedSubTasks = (t.subTasks || []).filter(
-          (st) => st.id !== subTaskId,
-        );
-        return { ...t, subTasks: updatedSubTasks };
-      }
-      return t;
-    });
-    setTodos(updatedTodos);
-    saveTodosForDate(dateKey, updatedTodos);
-  };
-
-  const toggleTodo = (id) => {
-    const updatedTodos = todos.map((t) =>
-      t.id === id ? { ...t, completed: !t.completed } : t,
-    );
-    setTodos(updatedTodos);
-    saveTodosForDate(dateKey, updatedTodos);
-  };
-
-  const deleteTodo = (id) => {
-    const updatedTodos = todos.filter((t) => t.id !== id);
-    setTodos(updatedTodos);
-    saveTodosForDate(dateKey, updatedTodos);
-  };
-
   // Save entry
   const saveEntry = useCallback(
     (showAlert = true) => {
@@ -361,8 +364,30 @@ const JournalView = ({
   // Format command execution
   const format = (command, value = null) => {
     editorRef.current?.focus();
+    // Restore saved selection if available
+    if (savedSelectionRef.current) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedSelectionRef.current);
+    }
     document.execCommand(command, false, value);
+    // Re-save the selection after formatting (cursor may have moved)
+    const sel = window.getSelection();
+    if (sel.rangeCount > 0) {
+      savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
+    }
     checkFormats();
+  };
+
+  // Queue a format from the mobile drawer — sets pending and closes drawer
+  const queueFormatFromDrawer = (command, value = null) => {
+    setPendingFormat({ command, value });
+    setIsToolbarOpen(false);
+  };
+
+  const queueListFromDrawer = (listType) => {
+    setPendingFormat({ listType });
+    setIsToolbarOpen(false);
   };
 
   // Check current formatting state
@@ -859,11 +884,16 @@ const JournalView = ({
   const activeJournal = journals.find((j) => j.id === activeJournalId);
 
   return (
-    <div
+    <motion.div
       id="journal-view"
-      className={`view-section ${
-        isActive ? "active" : "hidden"
-      } font-['Lora'] ${zenBg} ${zenText}`}
+      initial={false}
+      animate={isActive ? "active" : "hidden"}
+      variants={{
+        active: { opacity: 1, pointerEvents: "auto", zIndex: 10, scale: 1 },
+        hidden: { opacity: 0, pointerEvents: "none", zIndex: 0, scale: 0.98 },
+      }}
+      transition={{ duration: 0.4, ease: "easeInOut" }}
+      className={`view-section font-['Lora'] ${zenBg} ${zenText}`}
     >
       {/* Left Side Panel - Quotes */}
       <aside
@@ -925,26 +955,18 @@ const JournalView = ({
 
       {/* Control Buttons */}
       <button
-        className={`fixed top-7 left-7 bg-transparent border border-gray-300 px-5 py-2.5 rounded-full font-['Inter'] text-sm font-medium cursor-pointer transition-all duration-300 z-500 hover:bg-white hover:border-black hover:text-black ${
+        className={`fixed top-4 left-4 md:top-7 md:left-7 bg-transparent border border-gray-300 px-3 py-1.5 md:px-5 md:py-2.5 rounded-full font-['Inter'] text-xs md:text-sm font-medium cursor-pointer transition-all duration-300 z-500 hover:bg-white hover:border-black hover:text-black ${
           zenMode
             ? "opacity-0 pointer-events-none hover:opacity-100 hover:pointer-events-auto"
             : ""
         }`}
         onClick={handleBack}
       >
-        ← BACK
+        ←
+        <span className="hidden md:inline"> BACK</span>
       </button>
 
-      <button
-        className={`fixed top-7 right-7 bg-black text-white border border-black px-5 py-2.5 rounded-full font-['Inter'] text-sm font-medium cursor-pointer transition-all duration-300 z-500 hover:bg-gray-800 ${
-          zenMode
-            ? "opacity-0 pointer-events-none hover:opacity-100 hover:pointer-events-auto"
-            : ""
-        }`}
-        onClick={() => saveEntry()}
-      >
-        SAVE ENTRY
-      </button>
+      
 
       {/* Autosave indicator */}
       {autosaveStatus === "saved" && (
@@ -959,65 +981,64 @@ const JournalView = ({
 
       {/* Main Journal Stage */}
       <div
-        className="h-full w-full flex flex-col items-center pt-12 overflow-y-auto pb-32 md:pb-0 px-4 md:px-0"
+        className="h-full w-full flex flex-col items-center pt-16 md:pt-12 overflow-y-auto pb-32 md:pb-0 px-4 md:px-0"
         id="stage"
         onClick={handleStageClick}
       >
         <div
-          className={`w-full max-w-[100px] h-px bg-gray-200 mb-12 ${
+          className={`w-full max-w-[100px] h-px bg-gray-200 mb-12 hidden md:block ${
             zenMode ? "opacity-0" : ""
           }`}
         ></div>
 
-        {/* Hero Container - Hide on Mobile if showing todos */}
+        {/* Hero Container — left-aligned on mobile, centered on desktop */}
         <div
-          className={`text-center mb-10 cursor-default transition-opacity duration-800 ${
+          className={`text-left md:text-center mb-6 md:mb-10 cursor-default transition-opacity duration-800 w-full max-w-[700px] md:max-w-none ${
             zenMode
               ? "opacity-0 pointer-events-none hover:opacity-100 hover:pointer-events-auto"
-              : showTodos
-                ? "md:opacity-20 md:pointer-events-none hidden md:block" // Hide on mobile when todos open
-                : "block"
+              : "block"
           }`}
         >
           <div
-            className={`font-['Inter'] text-sm tracking-widest uppercase mb-2 flex justify-center gap-5 font-semibold ${zenMuted}`}
+            className={`font-['Inter'] text-xs md:text-sm tracking-widest uppercase mb-1 md:mb-2 flex justify-start md:justify-center gap-3 md:gap-5 font-semibold ${zenMuted}`}
           >
             <span>{monthYearDisplay}</span>
+            <span className="text-gray-300">·</span>
             <span>{timeDisplay}</span>
           </div>
 
-          <div className="flex items-center justify-center gap-8">
+          <div className="flex items-center justify-start md:justify-center gap-4 md:gap-8">
             <button
-              className={`bg-transparent border-none text-3xl cursor-pointer transition-all duration-300 font-['Inter'] opacity-50 hover:opacity-100 hover:scale-120 ${zenMuted}`}
+              className={`hidden md:block bg-transparent border-none text-3xl cursor-pointer transition-all duration-300 font-['Inter'] opacity-50 hover:opacity-100 hover:scale-120 ${zenMuted}`}
               onClick={() => handleChangeDay(-1)}
             >
               ←
             </button>
             <h1
-              className={`font-['Playfair_Display'] text-7xl leading-none m-0 ${
+              className={`font-['Playfair_Display'] text-4xl md:text-7xl leading-none m-0 ${
                 zenMode ? "text-gray-300" : "text-black"
               }`}
             >
               {dayDisplay}
             </h1>
             <button
-              className={`bg-transparent border-none text-3xl cursor-pointer transition-all duration-300 font-['Inter'] opacity-50 hover:opacity-100 hover:scale-120 ${zenMuted}`}
+              className={`hidden md:block bg-transparent border-none text-3xl cursor-pointer transition-all duration-300 font-['Inter'] opacity-50 hover:opacity-100 hover:scale-120 ${zenMuted}`}
               onClick={() => handleChangeDay(1)}
             >
               →
             </button>
           </div>
 
-          <div className="font-['Lora'] italic text-lg text-gray-500 mt-4 opacity-80">
+          <div className="font-['Lora'] italic text-sm md:text-lg text-gray-500 mt-2 md:mt-4 opacity-80">
             {prompt}
           </div>
         </div>
 
         {/* Editor Wrapper */}
         <div className="w-full max-w-[700px] pb-24 relative z-20">
-          {/* Journal Switcher */}
+          {/* Journal Switcher — hidden on mobile, shown on desktop */}
           <div
-            className={`mb-4 flex items-center gap-3 transition-opacity duration-500 ${
+            className={`mb-4 hidden md:flex items-center gap-3 transition-opacity duration-500 ${
               zenMode ? "opacity-0 pointer-events-none" : ""
             }`}
           >
@@ -1205,21 +1226,7 @@ const JournalView = ({
               +
             </button>
 
-            {/* Toggle To-Do Button - Desktop Only */}
-            <button
-              onClick={() => setShowTodos(!showTodos)}
-              className={`hidden md:flex items-center justify-center h-9 px-3 rounded-lg font-['Inter'] text-sm font-medium transition-all duration-300 gap-2 ${
-                zenMode
-                  ? "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
-                  : showTodos
-                    ? "bg-black text-white"
-                    : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-black"
-              }`}
-              title="Toggle Tasks"
-            >
-              <span className="text-lg">✓</span>
-              <span>Tasks</span>
-            </button>
+            
 
             {/* Hour View Button */}
             <button
@@ -1236,34 +1243,16 @@ const JournalView = ({
             </button>
           </div>
 
-          {/* Task Panel (Desktop Collapsible) */}
-          <TaskPanel
-            showTodos={showTodos}
-            zenMode={zenMode}
-            todos={todos}
-            onAddTodo={handleAddTodo}
-            onToggleTodo={toggleTodo}
-            onDeleteTodo={deleteTodo}
-            habits={habits}
-            onAddHabit={onAddHabit}
-            onUpdateHabit={onUpdateHabit}
-            onDeleteHabit={onDeleteHabit}
-            onAddReflection={onAddReflection}
-            onAddSubTask={addSubTask}
-            onToggleSubTask={toggleSubTask}
-            onDeleteSubTask={deleteSubTask}
-          />
+          
 
           {/* Toolbar - Hide on Mobile if showing todos */}
           <div
-            className={`flex gap-2 mb-5 border-b pb-4 transition-all duration-500 sticky top-0 z-40 px-2 pt-2 -mx-2 backdrop-blur-md rounded-b-xl ${
+            className={`hidden md:flex gap-2 mb-5 border-b pb-4 sticky top-0 z-40 px-2 pt-2 -mx-2 backdrop-blur-md rounded-b-xl overflow-x-auto ${
               zenMode
                 ? "border-white/15 bg-[#050505]/80"
                 : "border-black/10 bg-white/80"
             } ${
-              showTodos
-                ? "md:opacity-20 md:pointer-events-none hidden md:flex"
-                : "opacity-100"
+              "opacity-100"
             }`}
           >
             <button
@@ -1447,6 +1436,190 @@ const JournalView = ({
             </div>
           </div>
 
+          
+          {/* Mobile Journal Pages FAB — bottom left */}
+          <button 
+            onClick={() => setIsJournalDrawerOpen(true)}
+            className="md:hidden fixed bottom-6 left-6 z-40 bg-white text-black border border-gray-200 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl hover:scale-105 transition-transform"
+          >
+            <BookOpen className="w-6 h-6" />
+          </button>
+
+          {/* Mobile Journal Pages Drawer Overlay */}
+          {isJournalDrawerOpen && (
+            <div 
+              className="md:hidden fixed inset-0 bg-black/40 z-50 backdrop-blur-sm"
+              onClick={() => setIsJournalDrawerOpen(false)}
+            />
+          )}
+
+          {/* Mobile Journal Pages Drawer Content */}
+          <div 
+            ref={journalDrawerRef}
+            className="md:hidden fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-50 p-6 flex flex-col gap-5 translate-y-full"
+          >
+            <div className="flex justify-between items-center border-b pb-4">
+              <h2 className="font-['Playfair_Display'] text-2xl font-black">Journal Pages</h2>
+              <button onClick={() => setIsJournalDrawerOpen(false)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:text-black hover:bg-gray-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Journal List */}
+            <div className="flex flex-col gap-2 max-h-[200px] overflow-y-auto">
+              {journals.length === 0 ? (
+                <div className="text-center py-4 text-gray-400">
+                  <span className="text-2xl block mb-2">📝</span>
+                  <span className="font-['Inter'] text-sm">No journals yet</span>
+                </div>
+              ) : (
+                journals.map((journal) => (
+                  <button
+                    key={journal.id}
+                    onClick={() => { switchJournal(journal.id); setIsJournalDrawerOpen(false); }}
+                    className={`w-full text-left px-4 py-3 rounded-2xl font-['Inter'] text-sm font-medium transition-all duration-200 flex items-center justify-between ${
+                      journal.id === activeJournalId
+                        ? "bg-black text-white"
+                        : "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-100"
+                    }`}
+                  >
+                    <span className="truncate">{journal.title}</span>
+                    <span className={`text-xs ${
+                      journal.id === activeJournalId ? "text-gray-400" : "text-gray-400"
+                    }`}>
+                      {new Date(journal.updatedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            {/* New Journal */}
+            <button
+              onClick={() => { createNewJournal(); setIsJournalDrawerOpen(false); }}
+              className="w-full bg-black text-white py-4 rounded-2xl font-bold tracking-widest text-sm uppercase flex items-center justify-center gap-2"
+            >
+              <span>+</span>
+              <span>New Journal</span>
+            </button>
+
+            {/* Day Navigation */}
+            <div className="flex justify-between items-center bg-gray-50 rounded-2xl p-2">
+              <button 
+                className="p-3 text-gray-500 hover:text-black hover:bg-white rounded-xl shadow-sm transition-all"
+                onClick={() => { handleChangeDay(-1); setIsJournalDrawerOpen(false); }}
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <span className="font-['Inter'] text-sm font-bold tracking-widest">{dayDisplay}</span>
+              <button 
+                className="p-3 text-gray-500 hover:text-black hover:bg-white rounded-xl shadow-sm transition-all"
+                onClick={() => { handleChangeDay(1); setIsJournalDrawerOpen(false); }}
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Daily Log Shortcut */}
+            <button
+              onClick={() => { setIsJournalDrawerOpen(false); onOpenDailyLog(); }}
+              className="w-full bg-gray-100 text-black py-4 rounded-2xl font-bold tracking-widest text-sm uppercase border border-gray-200"
+            >
+              ⚡ Daily Log
+            </button>
+          </div>
+
+          {/* Mobile Undo FAB — above formatting FAB */}
+          <button 
+            onClick={() => { document.execCommand('undo', false, null); }}
+            className="md:hidden fixed bottom-24 right-6 z-40 bg-white text-gray-600 border border-gray-200 w-11 h-11 rounded-full flex items-center justify-center shadow-lg hover:scale-105 hover:text-black transition-all"
+            title="Undo"
+          >
+            <Undo2 className="w-5 h-5" />
+          </button>
+
+          {/* Mobile Toolbar FAB — bottom right */}
+          <button 
+            onClick={() => { saveSelection(); setIsToolbarOpen(true); }}
+            className="md:hidden fixed bottom-6 right-6 z-40 bg-black text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl hover:scale-105 transition-transform"
+          >
+            <PenLine className="w-6 h-6" />
+          </button>
+
+          {/* Mobile Drawer Overlay */}
+          {isToolbarOpen && (
+            <div 
+              className="md:hidden fixed inset-0 bg-black/40 z-50 backdrop-blur-sm"
+              onClick={() => setIsToolbarOpen(false)}
+            />
+          )}
+
+          {/* Mobile Toolbar Drawer Content */}
+          <div 
+            ref={toolbarDrawerRef}
+            className="md:hidden fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-50 p-6 flex flex-col gap-6 translate-y-full"
+          >
+            <div className="flex justify-between items-center border-b pb-4">
+              <h2 className="font-['Playfair_Display'] text-2xl font-black">Formatting</h2>
+              <button onClick={() => setIsToolbarOpen(false)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:text-black hover:bg-gray-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-3 overflow-y-auto max-h-[300px]">
+              <button
+                className={`fmt-btn-drawer bg-gray-50 border border-transparent font-['Inter'] text-sm font-medium cursor-pointer px-4 py-3 text-lg flex-grow flex justify-center border-gray-200 rounded-md transition-all duration-200 relative ${
+                  formatState.bold ? "bg-black text-white font-bold" : "text-gray-600 hover:bg-gray-200"
+                }`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => queueFormatFromDrawer("bold")}
+              >
+                <b>B</b>
+              </button>
+              <button
+                className={`fmt-btn-drawer bg-gray-50 border border-transparent font-['Inter'] text-sm font-medium cursor-pointer px-4 py-3 text-lg flex-grow flex justify-center border-gray-200 rounded-md transition-all duration-200 relative ${
+                  formatState.italic ? "bg-black text-white font-bold" : "text-gray-600 hover:bg-gray-200"
+                }`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => queueFormatFromDrawer("italic")}
+              >
+                <i>I</i>
+              </button>
+              <button
+                className={`fmt-btn-drawer bg-gray-50 border border-transparent font-['Inter'] text-sm font-medium cursor-pointer px-4 py-3 text-lg flex-grow flex justify-center border-gray-200 rounded-md transition-all duration-200 relative ${
+                  formatState.h2 ? "bg-black text-white font-bold" : "text-gray-600 hover:bg-gray-200"
+                }`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => queueFormatFromDrawer("formatBlock", "H2")}
+              >
+                H1
+              </button>
+              <button
+                className={`fmt-btn-drawer bg-gray-50 border border-transparent font-['Inter'] text-sm font-medium cursor-pointer px-4 py-3 text-lg flex-grow flex justify-center border-gray-200 rounded-md transition-all duration-200 relative ${
+                  formatState.blockquote ? "bg-black text-white font-bold" : "text-gray-600 hover:bg-gray-200"
+                }`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => queueFormatFromDrawer("formatBlock", "BLOCKQUOTE")}
+              >
+                ❝
+              </button>
+              <button
+                className={`fmt-btn-drawer bg-gray-50 border border-transparent font-['Inter'] text-sm font-medium cursor-pointer px-4 py-3 text-lg flex-grow flex justify-center border-gray-200 rounded-md transition-all duration-200 relative text-gray-600 hover:bg-gray-200`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => queueListFromDrawer("bullet")}
+              >
+                •
+              </button>
+              <button
+                className={`fmt-btn-drawer bg-gray-50 border border-transparent font-['Inter'] text-sm font-medium cursor-pointer px-4 py-3 text-lg flex-grow flex justify-center border-gray-200 rounded-md transition-all duration-200 relative text-gray-600 hover:bg-gray-200`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => queueListFromDrawer("numbered")}
+              >
+                1.
+              </button>
+            </div>
+          </div>
+          
           {/* Editor */}
           {activeJournalId ? (
             <div
@@ -1456,9 +1629,7 @@ const JournalView = ({
               className={`outline-none min-h-[50vh] text-lg leading-relaxed ${
                 zenMode ? "text-gray-300" : "text-gray-800"
               } empty:before:content-[attr(placeholder)] empty:before:text-gray-300 transition-opacity duration-300 ${
-                showTodos
-                  ? "md:opacity-20 md:pointer-events-none hidden md:block"
-                  : "opacity-100"
+                "opacity-100"
               }`}
               onFocus={handleEditorFocus}
               onKeyUp={checkFormats}
@@ -1486,35 +1657,13 @@ const JournalView = ({
             </div>
           )}
         </div>
-        {/* Floating Bottom Navbar - Mobile Only */}
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-full px-1.5 py-1.5 flex items-center gap-1 z-[100] md:hidden">
-          <button
-            onClick={() => setShowTodos(false)}
-            className={`px-5 py-2.5 rounded-full font-['Inter'] text-sm font-medium transition-all duration-300 ${
-              !showTodos
-                ? "bg-black text-white shadow-md"
-                : "text-gray-600 hover:text-black"
-            }`}
-          >
-            Journal
-          </button>
-          <button
-            onClick={() => setShowTodos(true)}
-            className={`px-5 py-2.5 rounded-full font-['Inter'] text-sm font-medium transition-all duration-300 ${
-              showTodos
-                ? "bg-black text-white shadow-md"
-                : "text-gray-600 hover:text-black"
-            }`}
-          >
-            Tasks
-          </button>
-        </div>
+        
 
         {/* Daily Log Button */}
         <div
           className={`w-full flex justify-center transition-all duration-500 delay-100 mt-6 ${
             zenMode ? "opacity-0 pointer-events-none" : "opacity-100"
-          } ${showTodos ? "hidden" : "block"}`}
+          } block`}
         >
           <button
             onClick={onOpenDailyLog}
@@ -1529,32 +1678,7 @@ const JournalView = ({
           </button>
         </div>
       </div>
-
-      {/* Hour View Overlay */}
-      {showHourView && (
-        <HourView
-          currentYear={currentYear}
-          currentMonth={currentMonth}
-          activeDayNum={activeDayNum}
-          onBack={() => setShowHourView(false)}
-          zenMode={zenMode}
-          todos={todos}
-          onAddTodo={handleAddTodo}
-          onToggleTodo={toggleTodo}
-          onDeleteTodo={deleteTodo}
-          // Subtask props
-          onAddSubTask={addSubTask}
-          onToggleSubTask={toggleSubTask}
-          onDeleteSubTask={deleteSubTask}
-          // Tag Props
-          userTags={userTags}
-          dayTags={dayTags}
-          onCreateTag={handleCreateTag}
-          onDeleteTag={handleDeleteTag}
-          onUpdateDayTags={handleUpdateDayTags}
-        />
-      )}
-    </div>
+    </motion.div>
   );
 };
 

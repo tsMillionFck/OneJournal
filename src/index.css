@@ -12,16 +12,7 @@
 /* View Transitions Component Classes */
 @layer components {
   .view-section {
-    @apply absolute inset-0 flex flex-col w-full h-full transition-all duration-700 ease-out;
-    will-change: opacity, transform;
-  }
-
-  .view-section.hidden {
-    @apply opacity-0 pointer-events-none scale-95 z-0;
-  }
-
-  .view-section.active {
-    @apply opacity-100 pointer-events-auto scale-100 z-10;
+    @apply absolute inset-0 flex flex-col w-full h-full;
   }
 }
 
