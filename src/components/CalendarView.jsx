@@ -11,7 +11,7 @@ import {
 import { Link } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
-import { User, LogIn, ChevronLeft, ChevronRight, Target, Settings, X } from "lucide-react";
+import { User, ChevronLeft, ChevronRight, Target, Settings, X } from "lucide-react";
 
 const CalendarView = ({
   currentYear,
@@ -81,29 +81,15 @@ const CalendarView = ({
       {/* Dynamic Island Header */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 hidden md:block">
         <header className="bg-white/90 backdrop-blur-md border border-gray-200 shadow-2xl rounded-full px-6 py-2.5 flex items-center gap-6 transition-all duration-300 hover:shadow-3xl hover:-translate-y-0.5">
-          {/* Login/Profile Button */}
+          {/* Profile Button */}
           <div className="group relative border-r border-gray-200 pr-6 mr-[-12px]">
-            {user ? (
-              <Link
-                to="/profile"
-                className="flex items-center justify-center w-8 h-8 rounded-full bg-black text-white hover:bg-gray-800 transition-all duration-300"
-                title="Profile"
-              >
-                <User className="w-4 h-4" />
-              </Link>
-            ) : (
-              <Link
-                to="/auth"
-                className="flex items-center justify-start w-8 h-8 rounded-full bg-gray-100/50 hover:bg-black group-hover:w-24 transition-all duration-500 ease-in-out overflow-hidden p-0"
-              >
-                <div className="w-8 h-8 flex items-center justify-center shrink-0">
-                  <LogIn className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors" />
-                </div>
-                <span className="flex-1 text-center whitespace-nowrap font-bold text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 pr-1">
-                  LOGIN
-                </span>
-              </Link>
-            )}
+            <Link
+              to="/profile"
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-black text-white hover:bg-gray-800 transition-all duration-300"
+              title="Profile"
+            >
+              <User className="w-4 h-4" />
+            </Link>
           </div>
 
           {/* Title & Date */}

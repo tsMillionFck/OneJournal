@@ -3,7 +3,6 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
-import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 
 // Components
@@ -306,7 +305,6 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/auth" element={<Auth />} />
           <Route path="/profile" element={<Profile />} />
         </Routes>
       </BrowserRouter>

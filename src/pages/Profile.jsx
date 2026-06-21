@@ -1,10 +1,10 @@
 import React, { useState, useContext, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { User, X, LogOut, Edit2, Save } from "lucide-react";
+import { User, X, Trash2, Edit2, Save } from "lucide-react";
 
 const Profile = () => {
-  const { user, logout, updateUserData } = useContext(AuthContext);
+  const { user, updateUserData } = useContext(AuthContext);
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [isEditing, setIsEditing] = useState(false);
@@ -14,37 +14,29 @@ const Profile = () => {
     if (user) {
       setUsername(user.username);
     } else {
-      navigate("/login");
+      navigate("/");
     }
   }, [user, navigate]);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/");
+  const handleClearData = () => {
+    if (window.confirm("Are you absolutely sure you want to clear all data? This will permanently delete all your journals, habits, logs, and settings.")) {
+      localStorage.clear();
+      // Re-initialize local user
+      const defaultUser = { username: "Journaler", email: "local@onejournal" };
+      localStorage.setItem("user-data", JSON.stringify(defaultUser));
+      // Reset app
+      window.location.href = "/";
+    }
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     setMsg("");
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/update`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ userId: user.id, username }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        updateUserData({ username: data.username });
-        setIsEditing(false);
-        setMsg("Profile updated!");
-      } else {
-        setMsg("Update failed");
-      }
-    } catch (err) {
-      console.error(err);
-      setMsg("Server error");
+    if (username.trim()) {
+      updateUserData({ username: username.trim() });
+      setIsEditing(false);
+      setMsg("Profile updated!");
+    } else {
+      setMsg("Username cannot be empty");
     }
   };
 
@@ -67,7 +59,7 @@ const Profile = () => {
           <h2 className="text-2xl font-black font-['Playfair_Display'] capitalize">
             {username}
           </h2>
-          <p className="text-gray-400 text-sm tracking-wide">{user.email}</p>
+          <p className="text-gray-400 text-sm tracking-wide">Local-First Mode</p>
         </div>
 
         {msg && (
@@ -113,11 +105,11 @@ const Profile = () => {
 
           <div className="pt-6 border-t border-gray-100">
             <button
-              onClick={handleLogout}
+              onClick={handleClearData}
               className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 px-8 rounded-xl transition-colors uppercase tracking-widest text-sm flex items-center justify-center gap-2"
             >
-              <LogOut className="w-4 h-4" />
-              <span>Sign Out</span>
+              <Trash2 className="w-4 h-4" />
+              <span>Clear All Data</span>
             </button>
           </div>
         </div>

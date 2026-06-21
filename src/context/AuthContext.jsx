@@ -7,37 +7,36 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkLoggedIn = async () => {
-      const token = localStorage.getItem("auth-token");
-      if (token) {
-        // Ideally verify token with backend here, for now just load from local storage if needed
-        // or assume valid session if token exists.
-        // For improvements: Implement a 'GET /me' user route.
-        const storedUser = localStorage.getItem("user-data");
-        if (storedUser) setUser(JSON.parse(storedUser));
+    const initializeUser = () => {
+      let storedUser = localStorage.getItem("user-data");
+      if (!storedUser) {
+        const defaultUser = { username: "Journaler", email: "local@onejournal" };
+        localStorage.setItem("user-data", JSON.stringify(defaultUser));
+        storedUser = JSON.stringify(defaultUser);
       }
+      setUser(JSON.parse(storedUser));
       setLoading(false);
     };
-    checkLoggedIn();
+    initializeUser();
   }, []);
 
   const login = (token, userData) => {
-    localStorage.setItem("auth-token", token);
     localStorage.setItem("user-data", JSON.stringify(userData));
     setUser(userData);
   };
 
   const updateUserData = (updatedData) => {
-    // Keep existing data but overwrite updated fields
     const newUser = { ...user, ...updatedData };
     localStorage.setItem("user-data", JSON.stringify(newUser));
     setUser(newUser);
   };
 
   const logout = () => {
-    localStorage.removeItem("auth-token");
     localStorage.removeItem("user-data");
-    setUser(null);
+    // Re-initialize with default guest user
+    const defaultUser = { username: "Journaler", email: "local@onejournal" };
+    localStorage.setItem("user-data", JSON.stringify(defaultUser));
+    setUser(defaultUser);
   };
 
   return (
